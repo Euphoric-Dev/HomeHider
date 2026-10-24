@@ -21,6 +21,8 @@ Home Hider is a payload (`.elf`) for jailbroken PS5 consoles. Start it from **Pa
 
 Nothing is ever deleted. Hidden games still work, and every change can be undone.
 
+**DISCLAIMER: THIS WAS VIBE CODED!!**
+
 ## Features
 
 | | |
