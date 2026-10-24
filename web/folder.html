@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Folder</title>
+<link rel="icon" id="favicon" href="data:,">
+<style>
+:root{--bg:#07080c;--text:#f2f4f8;--muted:#9aa3b5;--focus:#ffffff;--accent:#2f6df5}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;color:var(--text);
+  font-family:-apple-system,"SST","Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:18px}
+body{background:radial-gradient(120% 90% at 85% 10%,#1b1f2b 0%,#0b0d13 45%,var(--bg) 100%) fixed;background-color:var(--bg)}
+@media (min-width:1200px){html,body{font-size:21px}}
+.wrap{max-width:1500px;margin:0 auto;padding:34px 16px 60px}
+header{display:flex;align-items:center}
+header > .ficon{margin-right:18px}
+.ficon{width:64px;height:64px;border-radius:14px;overflow:hidden;flex:none;background:#1b2030}
+.ficon img{width:100%;height:100%;display:block;object-fit:cover}
+h1{font-size:1.35em;font-weight:500;margin:0}
+.bar{display:flex;align-items:center;justify-content:space-between;margin:26px 0 14px;color:var(--muted);font-size:.85em}
+.sort{font:inherit;color:var(--muted);background:none;border:2px solid transparent;border-radius:10px;padding:6px 12px;cursor:pointer}
+.sort b{color:var(--text);font-weight:500}
+.sort:focus,.sort:hover{border-color:#ffffff55;outline:none}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-gap:44px 18px;gap:44px 18px}
+@media (min-width:900px){.grid{grid-template-columns:repeat(5,1fr)}}
+@media (min-width:1350px){.grid{grid-template-columns:repeat(6,1fr)}}
+.tile{position:relative;display:block;padding:0;border:0;background:#141821;border-radius:10px;cursor:pointer;
+  width:100%;height:0;padding-bottom:100%;overflow:visible;font:inherit;color:inherit;transition:transform .12s}
+.tile .art{position:absolute;top:0;left:0;right:0;bottom:0;border-radius:10px;overflow:hidden;
+  background:linear-gradient(160deg,#252b3b,#141821)}
+.tile .art img{width:100%;height:100%;object-fit:cover;display:block}
+.tile .ph{position:absolute;left:0;right:0;top:40%;padding:0 12px;text-align:center;font-weight:600;font-size:.9em;color:#cfd6e4}
+.tile .name{position:absolute;left:0;right:0;top:calc(100% + 8px);text-align:center;font-size:.8em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .12s}
+.tile:focus,.tile:hover{outline:none;transform:scale(1.06);z-index:2}
+.tile:focus .art,.tile:hover .art{box-shadow:0 0 0 4px var(--focus),0 12px 30px #000a}
+.tile:focus .name,.tile:hover .name{opacity:1}
+.row-gap{height:22px}
+.empty,.msg{color:var(--muted);text-align:center;padding:60px 16px}
+.toast{position:fixed;left:50%;bottom:36px;transform:translateX(-50%);background:#1d2436;border:1px solid #2f6df566;
+  color:#fff;padding:14px 24px;border-radius:14px;box-shadow:0 10px 40px #000a;display:none;max-width:90%}
+.toast.show{display:block}
+.ask{position:fixed;top:0;left:0;right:0;bottom:0;background:#000b;display:none;z-index:10}
+.ask.show{display:block}
+.ask .box{max-width:620px;margin:18vh auto 0;background:#1d2436;border:1px solid #2f6df566;border-radius:18px;
+  padding:26px 26px 18px;box-shadow:0 20px 60px #000c}
+.ask .t{font-size:1.05em;line-height:1.4;margin-bottom:6px}
+.ask .s{color:var(--muted);font-size:.8em;margin-bottom:18px}
+.ask button{font:inherit;font-size:.9em;font-weight:600;color:#fff;background:var(--accent);border:2px solid transparent;
+  border-radius:12px;padding:10px 20px;margin:0 10px 10px 0;cursor:pointer;min-height:48px}
+.ask button.ghost{background:#2a3142}
+.ask button:focus{outline:3px solid #fff;outline-offset:3px}
+.foot{margin-top:60px;text-align:center}
+.foot a{color:var(--muted);font-size:.8em;text-decoration:none;border:2px solid transparent;border-radius:8px;padding:6px 10px}
+.foot a:focus,.foot a:hover{border-color:#ffffff55;outline:none;color:#fff}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="ficon"><img id="ficon" alt=""></div>
+    <h1 id="title">Folder</h1>
+  </header>
+  <div class="bar">
+    <span id="count"></span>
+    <button class="sort" id="sortBtn" onclick="toggleSort()">Sort by: <b id="sortLbl">Most Recent</b></button>
+  </div>
+  <div id="grid" class="grid"></div>
+  <div id="msg" class="msg" style="display:none"></div>
+  <div class="foot"><a id="edit" href="/">Edit this folder in Home Hider</a></div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="ask" id="ask"><div class="box"><div class="t" id="askT"></div><div class="s" id="askS"></div>
+  <button id="askYes">Close it and start</button><button class="ghost" id="askNo" onclick="hideAsk()">Cancel</button></div></div>
+
+<script>
+var folder = null, sortMode = 'recent', cols = 5;
+var id = (location.pathname.match(/\/folder\/([A-Z0-9]{9})/) || [])[1] || '';
+try { if (localStorage.getItem('hh_sort') === 'name') sortMode = 'name'; } catch (e) {}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+var LOCAL = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+
+function req(method, url, cb) {
+  var x = new XMLHttpRequest();
+  x.open(method, url, true);
+  x.timeout = 20000;
+  x.onload = function () { var j; try { j = JSON.parse(x.responseText); } catch (e) { j = { ok: false, error: 'HTTP ' + x.status }; } cb(j); };
+  x.onerror = x.ontimeout = function () {
+    cb({ ok: false, network: true, error: 'Home Hider is not running. Start it from Payload Manager, then open this folder again.' });
+  };
+  x.send(method === 'POST' ? '' : null);
+}
+
+function showMsg(t) {
+  var m = document.getElementById('msg');
+  m.textContent = t;
+  m.style.display = '';
+}
+
+function toast(t) {
+  var el = document.getElementById('toast');
+  el.textContent = t;
+  el.className = 'toast show';
+  clearTimeout(el._t);
+  el._t = setTimeout(function () { el.className = 'toast'; }, 3500);
+}
+
+function load() {
+  if (!id) { showMsg('Folder not found.'); return; }
+  document.getElementById('edit').href = '/#folder=' + id;
+  document.getElementById('ficon').src = '/api/folder_icon?id=' + id + '&v=' + Date.now();
+  document.getElementById('favicon').href = '/api/folder_icon?id=' + id;
+  req('GET', '/api/folder?id=' + id, function (j) {
+    if (!j.ok) { showMsg(j.error); return; }
+    folder = j.folder;
+    document.title = folder.name;
+    document.getElementById('title').textContent = folder.name;
+    render();
+  });
+}
+
+function sorted() {
+  var a = folder.items.slice();
+  if (sortMode === 'name') a.sort(function (x, y) { return x.name.toLowerCase() < y.name.toLowerCase() ? -1 : 1; });
+  else a.sort(function (x, y) { return y.recent - x.recent; });
+  return a;
+}
+
+function render() {
+  var items = sorted();
+  document.getElementById('sortLbl').textContent = sortMode === 'name' ? 'Name' : 'Most Recent';
+  document.getElementById('count').textContent = 'All: ' + items.length;
+  var html = '';
+  for (var i = 0; i < items.length; i++) {
+    var t = items[i];
+    html += '<button class="tile" data-i="' + i + '" data-id="' + t.id + '" onclick="launch(this)">' +
+      '<span class="art"><span class="ph">' + esc(t.name) + '</span></span>' +
+      '<span class="name">' + esc(t.name) + '</span></button>';
+  }
+  document.getElementById('grid').innerHTML = html;
+  if (!items.length) showMsg('This folder is empty. Add games to it in Home Hider.');
+  var tiles = document.querySelectorAll('.tile');
+  for (var k = 0; k < tiles.length; k++) art(tiles[k]);
+  if (tiles.length) tiles[0].focus();
+  measure();
+}
+
+function art(btn) {
+  var img = new Image();
+  img.onload = function () { btn.firstChild.innerHTML = ''; btn.firstChild.appendChild(img); };
+  img.src = '/api/icon?id=' + btn.getAttribute('data-id');
+}
+
+function measure() {
+  var tiles = document.querySelectorAll('.tile');
+  if (tiles.length < 2) { cols = 1; return; }
+  var top = tiles[0].offsetTop, c = 0;
+  for (var i = 0; i < tiles.length && tiles[i].offsetTop === top; i++) c++;
+  cols = c || 1;
+}
+
+function toggleSort() {
+  sortMode = sortMode === 'name' ? 'recent' : 'name';
+  try { localStorage.setItem('hh_sort', sortMode); } catch (e) {}
+  render();
+}
+
+function launch(btn) {
+  startLaunch(btn.getAttribute('data-id'), btn.querySelector('.name').textContent, false);
+}
+
+var launching = false;
+function startLaunch(id, name, closeRunning) {
+  if (launching) return;
+  launching = true;
+  hideAsk();
+  toast('Starting ' + name + '…');
+  req('POST', '/api/launch?local=' + (LOCAL ? 1 : 0) + (closeRunning ? '&close_running=1' : '') +
+      '&id=' + id, function (j) {
+    if (!j.ok) { launching = false; if (!j.network) toast(j.error); return; }
+    if (j.url) {           /* a web link app (Payload Manager and the like) */
+      launching = false;
+      if (LOCAL) location.href = j.url; else toast(j.note);
+      return;
+    }
+    poll(j.job, id, name, 0);
+  });
+}
+
+/* the browser can be paused while the game takes over the screen, so a
+ * failed request here usually means the game started */
+function poll(job, id, name, tries) {
+  req('GET', '/api/launch_status?job=' + job, function (j) {
+    if (!j.ok) {
+      if (j.network && tries < 20) setTimeout(function () { poll(job, id, name, tries + 1); }, 1000);
+      else launching = false;
+      return;
+    }
+    if (!j.done) {
+      if (tries < 150) setTimeout(function () { poll(job, id, name, tries + 1); }, 400);
+      else launching = false;
+      return;
+    }
+    launching = false;
+    if (j.result === 'ok') toast(j.note + '…');
+    else if (j.result === 'other_running') ask(j.other.name, id, name);
+    else toast(j.error);
+  });
+}
+
+var askFrom = null;
+function ask(other, id, name) {
+  document.getElementById('askT').innerHTML = '<b>' + esc(other) + '</b> is running. Close it and start <b>' + esc(name) + '</b>?';
+  document.getElementById('askS').textContent = 'Anything you haven\'t saved in ' + other + ' will be lost.';
+  document.getElementById('askYes').onclick = function () { startLaunch(id, name, true); };
+  askFrom = document.activeElement;
+  document.getElementById('ask').className = 'ask show';
+  document.getElementById('askNo').focus();
+}
+
+function hideAsk() {
+  var a = document.getElementById('ask');
+  if (a.className.indexOf('show') < 0) return;
+  a.className = 'ask';
+  if (askFrom && askFrom.focus) askFrom.focus();
+}
+
+/* the PS5 browser keeps its own title bar; full screen hides it where the
+ * browser allows it (needs a button press first) */
+var triedFull = false;
+function goFull() {
+  if (triedFull) return;
+  triedFull = true;
+  var d = document.documentElement;
+  try {
+    if (d.requestFullscreen) d.requestFullscreen();
+    else if (d.webkitRequestFullscreen) d.webkitRequestFullscreen();
+  } catch (e) {}
+}
+document.addEventListener('keydown', goFull, true);
+document.addEventListener('mousedown', goFull, true);
+
+/* D-pad / arrow keys move between tiles like the Game Library */
+document.addEventListener('keydown', function (e) {
+  var el = document.activeElement;
+  if (document.getElementById('ask').className.indexOf('show') >= 0) {
+    if (e.keyCode === 37 || e.keyCode === 39) {
+      e.preventDefault();
+      document.getElementById(el && el.id === 'askYes' ? 'askNo' : 'askYes').focus();
+    } else if (e.keyCode === 27) {
+      e.preventDefault();
+      hideAsk();
+    }
+    return;
+  }
+  if (!el || !el.classList || !el.classList.contains('tile')) return;
+  var i = parseInt(el.getAttribute('data-i'), 10), n = document.querySelectorAll('.tile').length, j = i;
+  if (e.keyCode === 37) j = i - 1;
+  else if (e.keyCode === 39) j = i + 1;
+  else if (e.keyCode === 38) j = i - cols;
+  else if (e.keyCode === 40) j = i + cols;
+  else return;
+  if (j < 0 || j >= n) return;
+  e.preventDefault();
+  var next = document.querySelector('.tile[data-i="' + j + '"]');
+  if (next) { next.focus(); if (next.scrollIntoView) next.scrollIntoView(false); }
+});
+window.addEventListener('resize', measure);
+load();
+</script>
+</body>
+</html>

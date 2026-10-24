@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home Hider</title>
+<style>
+:root{
+  --bg:#0a0c11;--surface:#141821;--surface2:#1b2030;--line:#2a3142;
+  --text:#eef1f7;--muted:#97a0b3;--accent:#2f6df5;--accent2:#5b8cff;
+  --ok:#3fb27f;--warn:#e0a43a;--bad:#e5534b;--radius:16px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,"SST","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:18px;line-height:1.45}
+@media (min-width:1200px){html,body{font-size:21px}}
+.wrap{max-width:1500px;margin:0 auto;padding:28px 16px 60px}
+header{display:flex;align-items:center;margin-bottom:6px}
+header > .logo{margin-right:16px}
+.logo{width:52px;height:52px;border-radius:14px;flex:none;
+  background:linear-gradient(140deg,#2f6df5,#7a4bf2);display:flex;align-items:center;justify-content:center}
+.logo svg{width:30px;height:30px}
+h1{font-size:1.7em;margin:0;letter-spacing:.2px}
+.ver{color:var(--muted);font-size:.7em;font-weight:400;margin-left:6px}
+.sub{color:var(--muted);margin:2px 0 20px}
+h2{font-size:1em;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);
+  margin:28px 0 12px;font-weight:600}
+h2 .n{color:var(--text);opacity:.6;margin-left:6px}
+.banner{display:none;border-radius:var(--radius);padding:14px 18px;margin:0 0 14px;
+  background:var(--surface2);border:1px solid var(--line)}
+.banner.show{display:flex;align-items:center;flex-wrap:wrap}
+.banner .msg{margin-right:14px}
+.banner.info{border-color:#2f6df566;background:#13203d}
+.banner.err{border-color:#e5534b88;background:#341818}
+.banner .msg{flex:1 1 300px}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;margin:4px 0 6px}
+.toolbar > *{margin:0 10px 10px 0}
+.search{flex:1 1 280px;min-width:0;font:inherit;color:var(--text);background:var(--surface);
+  border:2px solid var(--line);border-radius:12px;padding:11px 16px;min-height:52px}
+.search:focus{outline:none;border-color:var(--accent2)}
+.chips{display:flex;flex-wrap:wrap}
+.chips > *{margin:0 8px 8px 0}
+.chip{background:var(--surface);border:2px solid var(--line);color:var(--muted);font-weight:600;
+  border-radius:99px;padding:9px 18px;min-height:48px}
+.chip:hover{background:var(--surface2)}
+.chip.on{background:#1d2c55;border-color:var(--accent2);color:#fff}
+.grid{display:grid;grid-template-columns:1fr;grid-gap:12px;gap:12px}
+@media (min-width:760px){.grid{grid-template-columns:1fr 1fr}}
+@media (min-width:1350px){.grid{grid-template-columns:1fr 1fr 1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px;display:flex;align-items:center;min-width:0}
+.card > * + *{margin-left:14px}
+.card.hidden .icon{opacity:.35;filter:grayscale(1)}
+.icon{width:72px;height:72px;border-radius:12px;flex:none;overflow:hidden;
+  background:var(--surface2);display:flex;align-items:center;justify-content:center}
+.icon img{width:100%;height:100%;object-fit:cover;display:block}
+.icon svg{width:40px;height:40px}
+.info{flex:1;min-width:0}
+.name{font-weight:650;font-size:1.02em;overflow-wrap:anywhere;word-wrap:break-word;word-break:break-word;line-height:1.25}
+.meta{color:var(--muted);font-size:.78em;margin-top:2px}
+.badge{display:inline-block;font-size:.72em;font-weight:600;padding:1px 9px;border-radius:99px;
+  margin-top:6px;border:1px solid transparent}
+.b-vis{color:#9fe0c0;background:#173527;border-color:#2c6b4c}
+.b-hid{color:#ffd28a;background:#3a2c12;border-color:#6d5320}
+.b-sys{color:var(--muted);background:var(--surface2);border-color:var(--line)}
+.btns{display:flex;flex-direction:column;flex:none}
+.btns > * + *{margin-top:8px}
+button,.btn{font:inherit;font-size:.92em;font-weight:600;color:#fff;background:var(--accent);
+  border:2px solid transparent;border-radius:12px;padding:10px 20px;cursor:pointer;
+  text-decoration:none;display:inline-block;min-height:48px;white-space:nowrap}
+button:hover,.btn:hover{background:var(--accent2)}
+button:focus,.btn:focus,.chip:focus{outline:3px solid #fff;outline-offset:3px}
+button[disabled]{opacity:.5;cursor:default}
+.ghost{background:var(--surface2);border-color:var(--line)}
+.ghost:hover{background:#262d40}
+.small{min-height:40px;padding:6px 14px;font-size:.82em}
+.danger{background:#8f2a25}
+.danger:hover{background:#b3352f}
+.danger.armed{background:var(--bad)}
+.empty{color:var(--muted);padding:20px;text-align:center;border:1px dashed var(--line);border-radius:var(--radius)}
+.row{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px 18px;display:flex;align-items:center;margin-bottom:10px}
+.row > * + *{margin-left:16px}
+.row .txt{flex:1}
+.hint{color:var(--muted);font-size:.8em}
+.switch{width:76px;min-width:76px;height:42px;min-height:42px;padding:0;border-radius:99px;
+  background:#3a4154;position:relative}
+.switch:after{content:"";position:absolute;top:5px;left:5px;width:32px;height:32px;border-radius:50%;
+  background:#fff;transition:left .15s}
+.switch.on{background:var(--ok)}
+.switch.on:after{left:39px}
+.switch:hover{background:#4a5268}.switch.on:hover{background:#4fc58f}
+details{margin-top:30px}
+summary{cursor:pointer;color:var(--muted);font-size:1em;text-transform:uppercase;
+  letter-spacing:1.5px;font-weight:600;padding:8px 0}
+summary:focus{outline:3px solid #fff;outline-offset:3px;border-radius:6px}
+.actions{display:flex;flex-wrap:wrap;margin:12px 0}
+.actions > *{margin:0 12px 12px 0}
+pre{background:#05070a;border:1px solid var(--line);border-radius:12px;padding:14px;
+  font-size:.7em;white-space:pre-wrap;word-break:break-all;max-height:420px;overflow:auto;display:none}
+pre.show{display:block}
+.foot{color:var(--muted);font-size:.85em;margin-top:34px;text-align:center}
+.offer{background:#13203d;border:1px solid #2f6df566;border-radius:var(--radius);padding:16px 18px;margin-bottom:10px}
+.offer .t{font-weight:650;font-size:1.05em}
+.offer .notes{color:var(--muted);font-size:.8em;white-space:pre-wrap;margin:8px 0 12px;max-height:180px;overflow:auto}
+.inline{display:flex;flex-wrap:wrap;align-items:center;margin-top:10px}
+.inline > *{margin:0 10px 8px 0}
+.inline .search{flex:1 1 220px;min-height:48px;padding:8px 14px}
+.inline input[type=file]{color:var(--muted);font:inherit;font-size:.85em;max-width:100%}
+.err-text{color:#ff9c95}
+details.sub{margin-top:8px}
+details.sub summary{font-size:.85em;letter-spacing:1px}
+.lock{color:var(--muted);font-size:.75em;max-width:150px;text-align:right}
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin:28px 0 12px}
+.sec-head h2{margin:0}
+.fcard .icon{width:84px;height:84px}
+.b-fold{color:#c9b6ff;background:#2a1f4d;border-color:#4d3a8c}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:22px;margin-top:10px}
+.panel h2{margin-top:0}
+.fm-msg{display:none;border-radius:12px;padding:12px 16px;margin:14px 0;background:#341818;border:1px solid #e5534b88}
+.fm-msg.show{display:block}
+.fm-msg.ok{background:#13203d;border-color:#2f6df566}
+.field{margin:16px 0}
+.field .lbl{color:var(--muted);font-size:.85em;margin-bottom:8px}
+.sw{width:48px;height:48px;min-height:48px;border-radius:50%;padding:0;border:3px solid transparent;margin-right:6px}
+.sw.on{border-color:#fff}
+.sw.none{background-color:#d9dde6;background-image:linear-gradient(45deg,#8a92a3 25%,transparent 25%,transparent 75%,#8a92a3 75%),
+  linear-gradient(45deg,#8a92a3 25%,transparent 25%,transparent 75%,#8a92a3 75%);background-size:16px 16px;background-position:0 0,8px 8px}
+.fm-icon img.bgprev{width:256px;height:144px;border-radius:12px;background:var(--surface2);object-fit:cover;display:block}
+.fm-icon img.bgprev:not([src]){border:2px dashed var(--line)}
+.check{display:flex;align-items:center;margin-top:10px;color:var(--muted);font-size:.85em}
+.check input{width:24px;height:24px;margin-right:10px}
+.fm-icon{display:flex;align-items:center;flex-wrap:wrap}
+.fm-icon > *{margin:0 14px 8px 0}
+.fm-icon img{width:120px;height:120px;border-radius:16px;background:var(--surface2);object-fit:cover}
+.fm-icon img:not([src]){border:2px dashed var(--line)}
+.pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-gap:10px;gap:10px;padding:4px}
+.pickc{position:relative;display:block;width:100%;background:var(--surface2);
+  border:3px solid var(--line);border-radius:14px;padding:10px;min-height:0;white-space:normal;font-weight:500;color:var(--text)}
+.pickc .pin{display:flex;flex-direction:column;align-items:center}
+.pickc .pin > *{margin-top:6px}
+.pickc:hover{background:var(--surface2)}
+.pickc.sel{border-color:var(--accent2);background:#16244a}
+.pickc .icon{width:96px;height:96px}
+.pickc .pn{font-size:.75em;line-height:1.2;text-align:center;overflow-wrap:anywhere;word-wrap:break-word;word-break:break-word;max-height:2.5em;overflow:hidden}
+.pickc .chk{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;background:var(--accent);
+  display:none;align-items:center;justify-content:center;font-size:.8em}
+.pickc.sel .chk{display:flex}
+.pickc .other{font-size:.65em;color:#c9b6ff;display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.foot b{color:var(--text)}
+.spin{display:inline-block;width:18px;height:18px;border:3px solid #ffffff55;border-top-color:#fff;
+  border-radius:50%;animation:sp 1s linear infinite;vertical-align:-3px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (max-width:520px){
+  .card{padding:12px;gap:12px}.icon{width:56px;height:56px}.icon svg{width:32px;height:32px}
+  button,.btn{padding:8px 14px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.7 10.7 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.1 4.1M6.6 6.6A17.4 17.4 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></div>
+    <h1>Home Hider<span class="ver" id="ver"></span></h1>
+  </header>
+  <p class="sub">Hide games, apps and system tiles from your home screen. Nothing is deleted, and you can show them again at any time.</p>
+
+  <div class="banner" id="banner"><div class="msg" id="bannerMsg"></div><span id="bannerAct"></span></div>
+  <div class="banner info" id="updTop"><div class="msg" id="updTopMsg"></div><button onclick="goUpdates()">See update</button></div>
+
+  <div id="mainView">
+  <div class="sec-head"><h2>Folders<span class="n" id="fcount"></span></h2>
+    <button class="ghost small" onclick="editFolder(null)">+ New folder</button></div>
+  <div id="folders"><div class="empty">Folders group games under one tile on your home screen.
+    Press <b>New folder</b> to make one.</div></div>
+
+  <h2>Games and apps</h2>
+  <div class="toolbar">
+    <input class="search" id="q" type="search" placeholder="Search by name or title ID" oninput="renderList()" autocomplete="off">
+    <div class="chips" id="chips"></div>
+  </div>
+  <div id="list"><div class="empty"><span class="spin"></span>&nbsp; Loading your games and apps…</div></div>
+
+  <h2>Updates</h2>
+  <div class="row">
+    <div class="txt"><div id="updMsg">Checking for updates…</div><div class="hint" id="updHint"></div></div>
+    <button class="ghost" id="updCheckBtn" onclick="updCheck(this)">Check for updates</button>
+  </div>
+  <div id="updOffers"></div>
+  <details class="sub" id="updSettings">
+    <summary>Update settings</summary>
+    <div class="row">
+      <div class="txt">GitHub repository<div class="hint">Where new versions are published, for example <b>yourname/HomeHider</b>. The latest release needs a HomeHider .elf attached.</div>
+        <div class="inline"><input class="search" id="repo" placeholder="owner/name" autocomplete="off" spellcheck="false"><button class="ghost" onclick="saveRepo(this)">Save</button></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="txt">Check for updates when Home Hider starts<div class="hint">Looks on GitHub and on USB drives. Nothing is installed until you press Install.</div></div>
+      <button class="switch" id="sw_auto" aria-label="Check for updates at start" onclick="toggleSetting('auto_check')"></button>
+    </div>
+    <div class="row">
+      <div class="txt">Install from a file<div class="hint">Pick a HomeHider .elf on this phone or PC. To update from a USB drive instead, copy the .elf to the drive's top folder (or a folder named homehider) and press Check for updates.</div>
+        <div class="inline"><input type="file" id="updFile" accept=".elf">
+          <label class="hint"><input type="checkbox" id="allowOlder"> Allow older versions</label>
+          <button class="ghost" onclick="uploadFile(this)">Install file</button></div>
+      </div>
+    </div>
+  </details>
+
+  <h2>Options</h2>
+  <div class="row">
+    <div class="txt">When Home Hider starts<div class="hint" id="openHint"></div>
+      <div class="chips" id="openChips" style="margin-top:10px"></div></div>
+  </div>
+  <div class="row">
+    <div class="txt">Re-hide at start<div class="hint">If the PS5 brings a hidden tile back (after an update, for example), hide it again each time Home Hider runs.</div></div>
+    <button class="switch" id="sw_reapply" aria-label="Re-hide at start" onclick="toggleSetting('reapply')"></button>
+  </div>
+
+  <details id="adv">
+    <summary>Advanced</summary>
+    <div class="actions">
+      <button class="ghost" onclick="reloadShell(this)">Refresh home screen now</button>
+      <button class="ghost" onclick="act('/api/unhide_all',this)">Show everything I hid</button>
+      <button class="ghost" onclick="diag(this)">Diagnostics</button>
+      <a class="btn ghost" href="/api/backup" id="dl">Download original backup</a>
+    </div>
+    <pre id="diag"></pre>
+    <div class="actions">
+      <button class="danger" onclick="restore(this)">Restore original backup</button>
+      <button class="danger" onclick="quitApp(this)">Quit Home Hider</button>
+    </div>
+    <p class="hint">"Refresh home screen now" restarts the home screen process. If it stays black for more than a few seconds, press the PS button or restart the console. "Restore original backup" puts back the database copy taken the first time Home Hider ran; games installed after that may need Safe Mode &gt; Rebuild Database to reappear.</p>
+  </details>
+
+  </div>
+<div class="panel" id="editorView" style="display:none">
+    <h2 id="fmTitle">New folder</h2>
+    <div class="field"><div class="lbl">Name</div>
+      <input class="search" id="fmName" maxlength="48" placeholder="For example: Sports" autocomplete="off" style="width:100%"></div>
+    <div class="field"><div class="lbl">Show the folder on</div>
+      <div class="chips" id="fmTab"></div></div>
+    <div class="field"><div class="lbl">Colour</div><div id="fmColors"></div></div>
+    <div class="field"><div class="lbl">Folder picture</div>
+      <div class="fm-icon"><img id="fmIcon" alt="">
+        <div><div class="hint" id="fmIconHint">The first four games make up the picture.</div>
+          <div class="inline">
+            <button class="ghost small" id="fmUsbBtn" onclick="toggleUsbPics(this)">Choose from USB drive</button>
+            <button class="ghost small" id="fmCollage" onclick="useCollage(this)">Use game pictures</button></div>
+          <div class="inline" id="fmFileRow"><span class="hint">From this phone or PC:</span>
+            <input type="file" id="fmFile" accept="image/*" onchange="pickPicture()"></div></div></div>
+      <div id="fmUsbHome"><div id="usbPics" style="display:none">
+        <div class="inline"><span class="hint" id="usbHint"></span>
+          <button class="ghost small" onclick="loadUsbPics()">Refresh</button></div>
+        <div class="pick" id="usbGrid"></div></div></div>
+      <div class="hint">GIFs use their first frame: home screen tiles can't play animation.</div></div>
+    <div class="field"><div class="lbl">Background on the home screen <span class="hint">(shown behind the home screen when the folder tile is selected)</span></div>
+      <div class="fm-icon"><img id="fmBg" class="bgprev" alt="">
+        <div><div class="hint" id="fmBgHint"></div>
+          <div class="inline">
+            <button class="ghost small" onclick="toggleUsbPics(this,'folderbg')">Choose from USB drive</button>
+            <button class="ghost small" id="fmBgNone" onclick="fmNoBg()">No background</button></div>
+          <div class="inline" id="fmBgFileRow"><span class="hint">From this phone or PC:</span>
+            <input type="file" id="fmBgFile" accept="image/*" onchange="fmPickBgFile()"></div></div></div>
+      <div id="fmBgUsbHome"></div>
+      <div class="hint">Use a wide picture (16:9, ideally 3840&times;2160). It's cropped from the middle. Saving a background can take up to 10 seconds.</div></div>
+    <div class="field"><div class="lbl">Games in this folder: <b id="fmCount">0</b> <span class="hint">(they're hidden from the home screen and shown inside the folder)</span></div>
+      <div class="toolbar"><input class="search" id="fmQ" type="search" placeholder="Search" oninput="renderPicker()" autocomplete="off">
+        <div class="chips" id="fmChips"></div></div>
+      <div class="pick" id="fmPick"></div></div>
+    <div class="fm-msg" id="fmMsg"></div>
+    <div class="actions">
+      <button onclick="saveFolder(this)">Save folder</button>
+      <button class="ghost" onclick="closeFolder()">Cancel</button>
+      <button class="danger" id="fmDelete" onclick="deleteFolder(this)">Delete folder</button>
+    </div>
+  </div>
+
+  <div class="panel" id="tileView" style="display:none">
+    <h2>Name, picture and background</h2>
+    <div class="field"><div class="lbl">Name on the home screen</div>
+      <input class="search" id="teName" maxlength="64" autocomplete="off" style="width:100%">
+      <div class="inline"><span class="hint" id="teOrig"></span>
+        <button class="ghost small" id="teOrigName" onclick="teOriginalName()">Use the original name</button></div></div>
+    <div class="field" id="tePicField"><div class="lbl">Picture</div>
+      <div class="fm-icon"><img id="teIcon" alt="">
+        <div><div class="hint" id="teIconHint"></div>
+          <div class="inline">
+            <button class="ghost small" onclick="toggleUsbPics(this,'tile')">Choose from USB drive</button>
+            <button class="ghost small" id="teOrigPic" onclick="teOriginalPic()">Use the original picture</button></div>
+          <div class="inline" id="teFileRow"><span class="hint">From this phone or PC:</span>
+            <input type="file" id="teFile" accept="image/*" onchange="tePickFile()"></div></div></div>
+      <div id="teUsbHome"></div>
+      <label class="check"><input type="checkbox" id="teClear"> Keep see-through parts transparent (no background colour)</label>
+      <div class="hint">GIFs use their first frame: home screen tiles can't play animation.</div></div>
+    <div class="field" id="teBgField"><div class="lbl">Background on the home screen <span class="hint">(shown behind the home screen when this tile is selected)</span></div>
+      <div class="fm-icon"><img id="teBg" class="bgprev" alt="">
+        <div><div class="hint" id="teBgHint"></div>
+          <div class="inline">
+            <button class="ghost small" onclick="toggleUsbPics(this,'tilebg')">Choose from USB drive</button>
+            <button class="ghost small" id="teOrigBg" onclick="teOriginalBg()">Use the original background</button></div>
+          <div class="inline" id="teBgFileRow"><span class="hint">From this phone or PC:</span>
+            <input type="file" id="teBgFile" accept="image/*" onchange="tePickBgFile()"></div></div></div>
+      <div id="teBgUsbHome"></div>
+      <div class="hint">Use a wide picture (16:9, ideally 3840&times;2160). It's cropped from the middle and saved in the same format as the game's own background. Saving can take up to 10 seconds.</div></div>
+    <div class="fm-msg" id="teMsg"></div>
+    <div class="actions">
+      <button onclick="saveTile(this)">Save</button>
+      <button class="ghost" onclick="closeTile()">Cancel</button>
+    </div>
+    <p class="hint">The game itself isn't changed. Home Hider only changes what the home screen shows, and puts your
+      name, picture and background back if the PS5 resets them. The home screen shows changes after it restarts.</p>
+  </div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+
+
+<script>
+window.onerror = function (msg, src, line) {
+  try {
+    var b = document.getElementById('banner');
+    document.getElementById('bannerMsg').innerHTML = 'Menu error: ' + String(msg).replace(/</g, '&lt;') + ' (line ' + line + ')';
+    b.className = 'banner show err';
+    var x = new XMLHttpRequest();
+    x.open('POST', '/api/clientlog?msg=' + encodeURIComponent(String(msg) + ' @' + line), true);
+    x.send('');
+  } catch (e) {}
+};
+var state = null;      /* /api/status */
+var tiles = [];        /* /api/list */
+var filter = 'all';
+var iconOk = {};       /* id -> true once an icon loaded */
+var iconBad = {};      /* id -> true if the console has no icon */
+
+var SYS_ICONS = {
+  NPXS40047: '<path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8V6a3 3 0 0 1 6 0v2" stroke-linecap="round"/>',
+  NPXS40075: '<rect x="3" y="5" width="15" height="12" rx="2"/><path d="M3 14l4-4 4 4 3-3 4 4"/><circle cx="18" cy="17" r="3.2" fill="#141821"/><circle cx="18" cy="17" r="1"/>',
+  NPXS40071: '<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>',
+  NPXS40063: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12h8M12 8v8"/>'
+};
+var GAME_ICON = '<rect x="2.5" y="7" width="19" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3" stroke-linecap="round"/><circle cx="16" cy="11.5" r=".8"/><circle cx="18" cy="13.5" r=".8"/>';
+var SYS_ICON = '<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="12" cy="12" r="3"/>';
+
+function svg(body) {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="#7aa2ff" stroke-width="1.6" stroke-linejoin="round">' + body + '</svg>';
+}
+
+function req(method, url, cb) {
+  var x = new XMLHttpRequest();
+  x.open(method, url, true);
+  x.timeout = 30000;
+  x.onload = function () {
+    var j = null;
+    try { j = JSON.parse(x.responseText); } catch (e) { j = { ok: false, error: x.responseText || ('HTTP ' + x.status) }; }
+    cb(j, x);
+  };
+  x.onerror = x.ontimeout = function () { cb({ ok: false, error: 'Home Hider is not responding. Is it still running?' }, x); };
+  x.send(method === 'POST' ? '' : null);
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function banner(kind, html, actionHtml) {
+  document.getElementById('banner').className = 'banner show ' + (kind || '');
+  document.getElementById('bannerMsg').innerHTML = html;
+  document.getElementById('bannerAct').innerHTML = actionHtml || '';
+}
+
+function busy(btn, on) {
+  if (!btn) return;
+  if (on) { btn._t = btn.innerHTML; btn.innerHTML = '<span class="spin"></span>'; btn.disabled = true; }
+  else { if (btn._t != null) btn.innerHTML = btn._t; btn.disabled = false; }
+}
+
+/* ---------- data ---------- */
+
+function loadStatus(after) {
+  req('GET', '/api/status', function (j) {
+    if (!j.ok) { banner('err', esc(j.error)); return; }
+    j._told = state ? state._told : false;
+    state = j;
+    renderStatus();
+    if (after) after();
+  });
+}
+
+function loadList(after) {
+  req('GET', '/api/list', function (j) {
+    if (!j.ok) {
+      document.getElementById('list').innerHTML = '<div class="empty">' + esc(j.error) + '</div>';
+      return;
+    }
+    tiles = j.tiles;
+    renderList();
+    if (after) after();
+  });
+}
+
+function renderStatus() {
+  var s = state;
+  document.getElementById('ver').textContent = 'v' + s.version;
+  renderOpenChips(s.settings.open_browser);
+  setSwitch('sw_reapply', s.settings.reapply);
+  setSwitch('sw_auto', s.settings.auto_check);
+  var repoEl = document.getElementById('repo');
+  if (document.activeElement !== repoEl) repoEl.value = s.settings.repo || '';
+  document.getElementById('dl').style.display = s.backup ? '' : 'none';
+  document.getElementById('foot').innerHTML = s.ip
+    ? 'Also open this menu from a phone or PC: <b>http://' + esc(s.ip) + ':' + s.port + '</b>' : '';
+  if (!s.db.ok) {
+    banner('err', '<b>Can\'t read the home screen database.</b> ' + esc(s.db.error) +
+      ' Open <b>Advanced &gt; Diagnostics</b> and share the output.');
+  } else if (!state._told) {
+    state._told = true;
+    var notes = [];
+    if (s.updated_to) notes.push('Home Hider was updated to <b>v' + esc(s.updated_to) + '</b>.');
+    if (s.reapplied_at_launch > 0) notes.push('The system had brought back ' + s.reapplied_at_launch +
+      ' hidden tile(s). Home Hider hid them again.');
+
+    if (notes.length) banner('info', notes.join(' '));
+  }
+}
+
+var OPEN_MODES = [
+  [1, 'Open the menu', 'The menu opens in the PS5 browser every time.'],
+  [2, 'Quiet when started by Autoload', 'The first start after the PS5 turns on (Autoload) runs quietly in the background. Starting Home Hider again from Payload Manager opens the menu.'],
+  [0, 'Never open the menu', 'Home Hider always runs quietly. Open the menu from a phone or PC, or at http://127.0.0.1:8090 in the PS5 browser.']
+];
+
+function renderOpenChips(mode) {
+  var h = '', hint = '';
+  for (var i = 0; i < OPEN_MODES.length; i++) {
+    var m = OPEN_MODES[i];
+    h += '<button class="chip' + (mode === m[0] ? ' on' : '') + '" onclick="setOpenMode(' + m[0] + ')">' + m[1] + '</button>';
+    if (mode === m[0]) hint = m[2];
+  }
+  document.getElementById('openChips').innerHTML = h;
+  document.getElementById('openHint').textContent = hint;
+}
+
+function setOpenMode(m) {
+  req('POST', '/api/settings?open_browser=' + m, function (j) {
+    if (!j.ok) { banner('err', esc(j.error)); return; }
+    loadStatus();
+  });
+}
+
+function setSwitch(id, on) {
+  var el = document.getElementById(id);
+  el.className = 'switch' + (on ? ' on' : '');
+  el.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
+
+/* ---------- list ---------- */
+
+var FILTERS = [
+  ['all', 'All'], ['games', 'Games tab'], ['media', 'Media tab'], ['hidden', 'Hidden']
+];
+var SECTIONS = [['games', 'Games tab'], ['media', 'Media tab'], ['none', 'Not on a tab']];
+
+function matches(t, f) {
+  if (f === 'hidden') return t.hidden;
+  if (f === 'games' || f === 'media') return t.tab === f;
+  return true;
+}
+
+function renderChips() {
+  var html = '';
+  for (var i = 0; i < FILTERS.length; i++) {
+    var f = FILTERS[i], n = 0;
+    for (var k = 0; k < tiles.length; k++) if (matches(tiles[k], f[0])) n++;
+    html += '<button class="chip' + (filter === f[0] ? ' on' : '') + '" onclick="setFilter(\'' + f[0] + '\')">' +
+      f[1] + ' <span style="opacity:.7">' + n + '</span></button>';
+  }
+  document.getElementById('chips').innerHTML = html;
+}
+
+function setFilter(f) { filter = f; renderList(); }
+
+function card(t) {
+  var badge;
+  if (t.hidden) badge = '<span class="badge b-hid">' + (t.on_list ? 'Hidden' : 'Hidden by the system') + '</span>';
+  else badge = '<span class="badge b-vis">Visible</span>' + (t.on_list ? ' <span class="badge b-hid">Came back</span>' : '');
+  if (t.kind === 'system') badge += ' <span class="badge b-sys">System</span>';
+  var main = t.hidden
+    ? '<button class="ghost" onclick="toggle(\'' + t.id + '\',0,this)">Show</button>'
+    : '<button onclick="toggle(\'' + t.id + '\',1,this)">Hide</button>';
+
+  if (t.folder) {
+    badge = '<span class="badge b-fold">In folder: ' + esc(folderName(t.folder)) + '</span>';
+    main = '<button class="ghost" onclick="editFolder(\'' + t.folder + '\')">Edit folder</button>';
+  }
+  var open = '<button class="ghost small" onclick="launch(\'' + t.id + '\',this)">Open</button>' +
+    '<button class="ghost small" onclick="editTile(\'' + t.id + '\')">Edit</button>';
+  var changes = [];
+  if (t.renamed) changes.push('Renamed');
+  if (t.custom_icon) changes.push('New picture');
+  if (t.custom_bg) changes.push('New background');
+  if (changes.length) badge += ' <span class="badge b-sys">' + changes.join(', ') + '</span>';
+  var fallback = svg(SYS_ICONS[t.id] || (t.kind === 'system' ? SYS_ICON : GAME_ICON));
+  return '<div class="card' + (t.hidden ? ' hidden' : '') + '">' +
+    '<div class="icon" data-id="' + t.id + '">' + fallback + '</div>' +
+    '<div class="info"><div class="name">' + esc(t.name) + '</div>' +
+    '<div class="meta">' + esc(t.id) + '</div>' + badge + '</div>' +
+    '<div class="btns">' + main + open + '</div></div>';
+}
+
+function renderList() {
+  renderChips();
+  var q = document.getElementById('q').value.toLowerCase().replace(/^\s+|\s+$/g, '');
+  var shown = [];
+  for (var i = 0; i < tiles.length; i++) {
+    var t = tiles[i];
+    if (!matches(t, filter)) continue;
+    if (q && t.name.toLowerCase().indexOf(q) < 0 && t.id.toLowerCase().indexOf(q) < 0) continue;
+    shown.push(t);
+  }
+  var html = '';
+  if (!shown.length) {
+    html = '<div class="empty">' + (tiles.length ? 'Nothing matches.' : 'No games or apps found.') + '</div>';
+  } else if (filter === 'all' && !q) {
+    for (var s = 0; s < SECTIONS.length; s++) {
+      var part = '', n = 0;
+      for (var k = 0; k < shown.length; k++) if (shown[k].tab === SECTIONS[s][0]) { part += card(shown[k]); n++; }
+      if (n) html += '<h2>' + SECTIONS[s][1] + '<span class="n">' + n + '</span></h2><div class="grid">' + part + '</div>';
+    }
+  } else {
+    html = '<div class="grid" style="margin-top:14px">';
+    for (var m = 0; m < shown.length; m++) html += card(shown[m]);
+    html += '</div>';
+  }
+  document.getElementById('list').innerHTML = html;
+  loadIcons();
+}
+
+/* icons: a few at a time so the console isn't flooded */
+var iconQueue = [], iconActive = 0;
+function loadIcons() {
+  iconQueue = [];
+  var els = document.querySelectorAll('.icon[data-id]');
+  for (var i = 0; i < els.length; i++) {
+    var id = els[i].getAttribute('data-id');
+    if (iconBad[id]) continue;
+    if (iconOk[id]) { putIcon(els[i], id); continue; }
+    iconQueue.push(id);
+  }
+  pumpIcons();
+}
+var iconVer = {};       /* id -> cache buster after a picture change */
+function iconUrl(id) { return '/api/icon?id=' + id + (iconVer[id] ? '&v=' + iconVer[id] : ''); }
+function putIcon(el, id) {
+  el.innerHTML = '<img alt="" src="' + iconUrl(id) + '">';
+}
+function pumpIcons() {
+  while (iconActive < 4 && iconQueue.length) {
+    (function (id) {
+      iconActive++;
+      var img = new Image();
+      img.onload = function () {
+        iconActive--; iconOk[id] = true;
+        var els = document.querySelectorAll('.icon[data-id="' + id + '"]');
+        for (var i = 0; i < els.length; i++) putIcon(els[i], id);
+        pumpIcons();
+      };
+      img.onerror = function () { iconActive--; iconBad[id] = true; pumpIcons(); };
+      img.src = iconUrl(id);
+    })(iconQueue.shift());
+  }
+}
+
+/* ---------- actions ---------- */
+
+var APPLY_NOTE = 'Saved. The home screen picks this up after you <b>open and close any game or app</b>, or restart the PS5.';
+
+function toggle(id, hide, btn) {
+  busy(btn, true);
+  req('POST', '/api/' + (hide ? 'hide' : 'unhide') + '?id=' + id, function (j) {
+    busy(btn, false);
+    if (!j.ok) { banner('err', esc(j.error)); return; }
+    loadList(function () {
+      banner('info', APPLY_NOTE, '<button class="ghost" onclick="reloadShell(this)">Refresh home screen now</button>');
+    });
+  });
+}
+
+var LOCAL = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+
+function tileName(id) {
+  for (var i = 0; i < tiles.length; i++) if (tiles[i].id === id) return tiles[i].name;
+  return id;
+}
+
+function launch(id, btn, closeRunning) {
+  busy(btn, true);
+  req('POST', '/api/launch?local=' + (LOCAL ? 1 : 0) + (closeRunning ? '&close_running=1' : '') + '&id=' + id, function (j) {
+    if (!j.ok) { busy(btn, false); banner('err', esc(j.error)); return; }
+    if (j.url) {           /* web link apps open their page */
+      busy(btn, false);
+      if (LOCAL) location.href = j.url; else banner('info', esc(j.note) + '.');
+      return;
+    }
+    pollLaunch(j.job, id, btn, 0);
+  });
+}
+
+/* while a game starts, the PS5 browser can pause: a failed request then
+ * usually means the game is on screen */
+function pollLaunch(job, id, btn, tries) {
+  req('GET', '/api/launch_status?job=' + job, function (j) {
+    if (!j.ok) {
+      if (/not responding/.test(j.error || '') && tries < 20) setTimeout(function () { pollLaunch(job, id, btn, tries + 1); }, 1000);
+      else busy(btn, false);
+      return;
+    }
+    if (!j.done) {
+      if (tries < 150) setTimeout(function () { pollLaunch(job, id, btn, tries + 1); }, 400);
+      else busy(btn, false);
+      return;
+    }
+    busy(btn, false);
+    if (j.result === 'ok') banner('info', esc(j.note) + '…');
+    else if (j.result === 'other_running')
+      banner('info', '<b>' + esc(j.other.name) + '</b> is running. Close it and start <b>' + esc(j.name) +
+        '</b>? Anything you haven\'t saved in ' + esc(j.other.name) + ' will be lost.',
+        '<button onclick="launch(\'' + id + '\', this, true)">Close it and start</button> ' +
+        '<button class="ghost" onclick="hideBanner()">Cancel</button>'), showBanner();
+    else banner('err', esc(j.error)), showBanner();
+  });
+}
+
+function hideBanner() { document.getElementById('banner').className = 'banner'; }
+function showBanner() {
+  var b = document.getElementById('banner');
+  if (b.scrollIntoView) b.scrollIntoView();
+  var btn = b.querySelector('button');
+  if (btn && btn.focus) btn.focus();
+}
+
+function toggleSetting(key) {
+  var v = state.settings[key] ? 0 : 1;
+  req('POST', '/api/settings?' + key + '=' + v, function (j) {
+    if (!j.ok) { banner('err', esc(j.error)); return; }
+    loadStatus();
+  });
+}
+
+function act(url, btn) {
+  busy(btn, true);
+  req('POST', url, function (j) {
+    busy(btn, false);
+    if (!j.ok) { banner('err', esc(j.error)); return; }
+    loadStatus(function () { loadList(function () { banner('info', esc(j.note) + '. ' + APPLY_NOTE); }); });
+  });
+}
+
+function reloadShell(btn) {
+  busy(btn, true);
+  req('POST', '/api/reload_shell', function (j) {
+    busy(btn, false);
+    if (!j.ok) banner('err', esc(j.error));
+    else banner('info', 'Home screen is restarting&hellip;');
+  });
+}
+
+function diag(btn) {
+  busy(btn, true);
+  var x = new XMLHttpRequest();
+  x.open('GET', '/api/diag', true);
+  x.onload = function () {
+    busy(btn, false);
+    var p = document.getElementById('diag');
+    p.textContent = x.responseText;
+    p.className = 'show';
+  };
+  x.onerror = function () { busy(btn, false); banner('err', 'Could not load diagnostics.'); };
+  x.send(null);
+}
+
+function confirmTwice(btn, label, go) {
+  if (btn._armed) { btn._armed = false; btn.className = btn.className.replace(' armed', ''); btn.innerHTML = btn._orig; go(); return; }
+  btn._armed = true;
+  btn._orig = btn.innerHTML;
+  btn.innerHTML = label;
+  btn.className += ' armed';
+  setTimeout(function () {
+    if (btn._armed) { btn._armed = false; btn.innerHTML = btn._orig; btn.className = btn.className.replace(' armed', ''); }
+  }, 4000);
+}
+
+function restore(btn) {
+  confirmTwice(btn, 'Press again to restore', function () { act('/api/restore', btn); });
+}
+
+function quitApp(btn) {
+  confirmTwice(btn, 'Press again to quit', function () {
+    req('POST', '/api/quit', function () {
+      banner('info', 'Home Hider has stopped. Launch it again from Payload Manager when you need it.');
+    });
+  });
+}
+
+/* ---------- updates ---------- */
+
+var upd = null, updTimer = null, waitingRestart = 0, browserOffer = null, browserTried = false;
+
+function verCmp(a, b) {
+  var x = String(a || '').replace(/^[vV]/, '').split('.'), y = String(b || '').replace(/^[vV]/, '').split('.');
+  for (var i = 0; i < 4; i++) {
+    var p = parseInt(x[i] || '0', 10) || 0, q = parseInt(y[i] || '0', 10) || 0;
+    if (p !== q) return p < q ? -1 : 1;
+  }
+  return 0;
+}
+
+function loadUpd() {
+  req('GET', '/api/update/status', function (j) {
+    if (!j.ok) return;
+    upd = j;
+    renderUpd();
+    if (j.phase === 'restarting') startRestartWait();
+    if (j.busy) pollUpd(1000);
+    else if (!browserTried && j.repo && j.github.checked && !j.github.ok && /reach|error/i.test(j.github.error || '')) {
+      browserTried = true;
+      browserCheck();
+    }
+  });
+}
+
+function pollUpd(ms) {
+  if (updTimer) return;
+  updTimer = setTimeout(function () { updTimer = null; if (waitingRestart) checkRestarted(); else loadUpd(); }, ms);
+}
+
+function mb(n) { return (n / 1048576).toFixed(1) + ' MB'; }
+
+function renderUpd() {
+  var u = upd, msg = '', hint = '';
+  if (!u) return;
+  if (u.busy) msg = '<span class="spin"></span>&nbsp; ' + esc(u.message || 'Working…') +
+    (u.phase === 'downloading' && u.progress ? ' ' + mb(u.progress) : '');
+  else if (u.phase === 'error') msg = '<span class="err-text">' + esc(u.message) + '</span>';
+  else if (u.phase === 'restarting' || u.phase === 'done') msg = esc(u.message);
+  else msg = 'You\'re running <b>v' + esc(u.current) + '</b>.' + (u.message && u.phase === 'idle' ? ' ' + esc(u.message.replace(/^You have the latest version.*$/, 'It\'s the latest version.')) : '');
+  if (!u.repo) hint = 'Set your GitHub repository in Update settings to get updates from GitHub. USB drives are always checked.';
+  else hint = 'GitHub: ' + esc(u.repo) + (u.github.checked && u.github.error ? ' — ' + esc(u.github.error) : '');
+  document.getElementById('updMsg').innerHTML = msg;
+  document.getElementById('updHint').innerHTML = hint;
+
+  var html = '';
+  if (u.github.newer) html += offer('v' + u.github.version + ' is on GitHub', u.github.notes, u.github.page,
+    '<button onclick="installUpd(\'github\',this)">Install</button>', u.github.digest ? 'Checked against GitHub\'s SHA-256.' : '');
+  else if (browserOffer) html += offer('v' + browserOffer.version + ' is on GitHub', browserOffer.notes, browserOffer.page,
+    '<button onclick="browserInstall(this)">Install</button>', 'Found by this browser because the PS5 couldn\'t reach GitHub directly.');
+  if (u.usb.newer) html += offer('v' + u.usb.version + ' is on a USB drive', '', '',
+    '<button onclick="installUpd(\'usb\',this)">Install</button>', u.usb.path);
+  document.getElementById('updOffers').innerHTML = html;
+  var topVer = u.github.newer ? u.github.version : (browserOffer ? browserOffer.version : (u.usb.newer ? u.usb.version : ''));
+  document.getElementById('updTop').className = 'banner info' + (topVer && !waitingRestart ? ' show' : '');
+  document.getElementById('updTopMsg').innerHTML = topVer ? 'Home Hider <b>v' + esc(topVer) + '</b> is available.' : '';
+  document.getElementById('updCheckBtn').disabled = !!u.busy || !!waitingRestart;
+}
+
+function offer(title, notes, page, buttons, small) {
+  return '<div class="offer"><div class="t">' + esc(title) + '</div>' +
+    (notes ? '<div class="notes">' + esc(notes.length > 900 ? notes.slice(0, 900) + '…' : notes) + '</div>' : '') +
+    (small ? '<div class="hint" style="margin:6px 0 10px">' + esc(small) + '</div>' : '') +
+    '<div class="inline">' + buttons + (page ? ' <a class="btn ghost" href="' + esc(page) + '" target="_blank" rel="noopener">Release page</a>' : '') + '</div></div>';
+}
+
+function goUpdates() {
+  var el = document.getElementById('updOffers');
+  if (el.scrollIntoView) el.scrollIntoView();
+  var b = el.querySelector('button');
+  if (b) b.focus();
+}
+
+function updCheck(btn) {
+  browserOffer = null; browserTried = false;
+  busy(btn, true);
+  req('POST', '/api/update/check', function (j) {
+    busy(btn, false);
+    if (!j.ok) { banner('err', esc(j.error)); return; }
+    pollUpd(400);
+  });
+}
+
+function installUpd(src, btn) {
+  busy(btn, true);
+  req('POST', '/api/update/install?source=' + src, function (j) {
+    busy(btn, false);
+    if (!j.ok) { banner('err', esc(j.error)); return; }
+    pollUpd(500);
+  });
+}
+
+function startRestartWait() {
+  if (waitingRestart) return;
+  waitingRestart = Date.now();
+  banner('info', '<span class="spin"></span>&nbsp; Installing the update and restarting Home Hider…');
+  pollUpd(1500);
+}
+
+function checkRestarted() {
+  req('GET', '/api/status', function (j) {
+    if (j.ok && state && j.version !== state.version) { location.reload(); return; }
+    if (Date.now() - waitingRestart > 45000) {
+      waitingRestart = 0;
+      loadUpd();
+      banner('info', 'The update is installed. If Home Hider didn\'t restart by itself, start it again from Payload Manager.');
+      return;
+    }
+    pollUpd(1500);
+  });
+}
+
+function sendElf(body, allowOlder, btn) {
+  var x = new XMLHttpRequest();
+  x.open('POST', '/api/update/upload?allow_older=' + (allowOlder ? 1 : 0), true);
+  x.timeout = 120000;
+  x.onload = function () {
+    busy(btn, false);
+    var j; try { j = JSON.parse(x.responseText); } catch (e) { j = { ok: false, error: 'HTTP ' + x.status }; }
+    if (!j.ok) { banner('err', esc(j.error)); return; }
+    banner('info', esc(j.note));
+    startRestartWait();
+  };
+  x.onerror = x.ontimeout = function () { busy(btn, false); banner('err', 'The upload didn\'t reach Home Hider.'); };
+  x.send(body);
+}
+
+function uploadFile(btn) {
+  var f = document.getElementById('updFile').files[0];
+  if (!f) { banner('err', 'Choose a HomeHider .elf file first.'); return; }
+  busy(btn, true);
+  sendElf(f, document.getElementById('allowOlder').checked, btn);
+}
+
+function saveRepo(btn) {
+  var v = document.getElementById('repo').value.replace(/^\s+|\s+$/g, '');
+  busy(btn, true);
+  req('POST', '/api/settings?repo=' + encodeURIComponent(v), function (j) {
+    busy(btn, false);
+    if (!j.ok) { banner('err', esc(j.error)); return; }
+    loadStatus(function () { if (v) updCheck(document.getElementById('updCheckBtn')); else loadUpd(); });
+  });
+}
+
+/* Fallback when the console itself can't reach GitHub: ask from this browser. */
+function browserCheck() {
+  if (!upd || !upd.repo) return;
+  var x = new XMLHttpRequest();
+  x.open('GET', 'https://api.github.com/repos/' + upd.repo + '/releases/latest', true);
+  x.timeout = 15000;
+  x.onload = function () {
+    if (x.status !== 200) return;
+    var r; try { r = JSON.parse(x.responseText); } catch (e) { return; }
+    var a = null, assets = r.assets || [];
+    for (var i = 0; i < assets.length; i++) {
+      if (/\.elf$/i.test(assets[i].name) && (!a || /homehider/i.test(assets[i].name))) a = assets[i];
+    }
+    if (!a || verCmp(r.tag_name, upd.current) <= 0) return;
+    browserOffer = { version: String(r.tag_name).replace(/^[vV]/, ''), api: a.url, page: r.html_url, notes: r.body || '' };
+    renderUpd();
+  };
+  x.send(null);
+}
+
+function browserInstall(btn) {
+  if (!browserOffer) return;
+  busy(btn, true);
+  var x = new XMLHttpRequest();
+  x.open('GET', browserOffer.api, true);
+  x.setRequestHeader('Accept', 'application/octet-stream');
+  x.responseType = 'arraybuffer';
+  x.timeout = 120000;
+  x.onload = function () {
+    if (x.status !== 200 || !x.response) return fail();
+    sendElf(x.response, false, btn);
+  };
+  function fail() {
+    busy(btn, false);
+    banner('err', 'This browser couldn\'t download the file. Open the <a href="' + esc(browserOffer.page) +
+      '" target="_blank" rel="noopener" style="color:#fff">release page</a>, download the .elf, then use ' +
+      '<b>Update settings &gt; Install from a file</b>, or copy it to a USB drive.');
+  }
+  x.onerror = x.ontimeout = fail;
+  x.send(null);
+}
+
+/* notice USB drives plugged in while the menu is open */
+setInterval(function () {
+  if (document.hidden || waitingRestart || !upd || upd.busy) return;
+  req('POST', '/api/update/check?usb_only=1', function (j) { if (j.ok) pollUpd(1500); });
+}, 20000);
+
+/* ---------- folders ---------- */
+
+var folders = [], fm = null, fmFilter = 'all', fmPendingFile = null, fmPendingUsb = null;
+var IS_PS5 = /PlayStation/i.test(navigator.userAgent);
+var COLORS = [['none', ''], ['blue', '#2f6df5'], ['purple', '#864bf2'], ['red', '#e5484d'], ['orange', '#f08c2e'],
+  ['green', '#2fb36b'], ['teal', '#1fb5c4'], ['gray', '#5b6378']];
+
+function folderName(id) {
+  for (var i = 0; i < folders.length; i++) if (folders[i].id === id) return folders[i].name;
+  return id;
+}
+
+function loadFolders(after) {
+  req('GET', '/api/folders', function (j) {
+    if (!j.ok) { if (after) after(); return; }
+    folders = j.folders;
+    renderFolders();
+    if (after) after();
+  });
+}
+
+function renderFolders() {
+  document.getElementById('fcount').textContent = folders.length ? folders.length : '';
+  if (!folders.length) {
+    document.getElementById('folders').innerHTML = '<div class="empty">Folders group games under one tile on your home screen. ' +
+      'Press <b>New folder</b> to make one.</div>';
+    return;
+  }
+  var html = '<div class="grid">';
+  for (var i = 0; i < folders.length; i++) {
+    var f = folders[i];
+    html += '<div class="card fcard"><div class="icon"><img alt="" src="/api/folder_icon?id=' + f.id + '&v=' + Date.now() + '"></div>' +
+      '<div class="info"><div class="name">' + esc(f.name) + '</div>' +
+      '<div class="meta">' + f.items.length + ' game' + (f.items.length === 1 ? '' : 's') + ' &middot; ' +
+      (f.tab === 'media' ? 'Media tab' : 'Games tab') + '</div>' +
+      (f.installed ? '' : '<span class="badge b-hid">Tile missing: press Edit, then Save</span>') + '</div>' +
+      '<div class="btns"><button onclick="editFolder(\'' + f.id + '\')">Edit</button>' +
+      '<a class="btn ghost small" href="/folder/' + f.id + '">Open</a></div></div>';
+  }
+  document.getElementById('folders').innerHTML = html + '</div>';
+}
+
+function editFolder(id) {
+  var f = null;
+  for (var i = 0; i < folders.length; i++) if (folders[i].id === id) f = folders[i];
+  fm = f ? { id: f.id, name: f.name, tab: f.tab, color: f.color, custom: f.custom_icon, customBg: f.custom_bg, items: f.items.map(function (x) { return x.id; }) }
+         : { id: '', name: '', tab: 'games', color: 'blue', custom: false, customBg: false, items: [] };
+  fm.bgUsb = null; fm.bgFile = null; fm.bgReset = false;
+  fmFilter = 'all';
+  fmPendingFile = null;
+  fmPendingUsb = null;
+  picTarget = 'folder';
+  document.getElementById('fmUsbHome').appendChild(document.getElementById('usbPics'));
+  document.getElementById('usbPics').style.display = 'none';
+  /* the PS5 browser can't open files; pictures come from USB there */
+  document.getElementById('fmFileRow').style.display = IS_PS5 ? 'none' : '';
+  document.getElementById('fmFile').value = '';
+  document.getElementById('fmQ').value = '';
+  document.getElementById('fmTitle').textContent = f ? 'Edit folder' : 'New folder';
+  document.getElementById('fmName').value = fm.name;
+  document.getElementById('fmDelete').style.display = f ? '' : 'none';
+  fmMsg('');
+  renderFm();
+  document.getElementById('mainView').style.display = 'none';
+  document.getElementById('editorView').style.display = '';
+  window.scrollTo(0, 0);
+  document.getElementById('fmName').focus();
+}
+
+/* message shown right above the Save button, so it's never off-screen */
+function fmMsg(html, ok) {
+  var el = document.getElementById('fmMsg');
+  el.innerHTML = html;
+  el.className = 'fm-msg' + (html ? ' show' : '') + (ok ? ' ok' : '');
+  if (html && el.scrollIntoView) el.scrollIntoView(false);
+}
+
+function closeFolder() {
+  document.getElementById('editorView').style.display = 'none';
+  document.getElementById('mainView').style.display = '';
+  window.scrollTo(0, 0);
+  fm = null;
+  if (location.hash && history.replaceState) history.replaceState(null, '', location.pathname);
+}
+
+function renderFm() {
+  var tabs = [['games', 'Games tab'], ['media', 'Media tab']], h = '';
+  for (var i = 0; i < tabs.length; i++)
+    h += '<button class="chip' + (fm.tab === tabs[i][0] ? ' on' : '') + '" onclick="fm.tab=\'' + tabs[i][0] + '\';renderFm()">' + tabs[i][1] + '</button>';
+  document.getElementById('fmTab').innerHTML = h;
+  h = '';
+  for (var c = 0; c < COLORS.length; c++)
+    h += '<button class="sw' + (COLORS[c][0] === 'none' ? ' none' : '') + (fm.color === COLORS[c][0] ? ' on' : '') +
+      '" aria-label="' + (COLORS[c][0] === 'none' ? 'no colour (see-through)' : COLORS[c][0]) + '"' +
+      (COLORS[c][1] ? ' style="background:' + COLORS[c][1] + '"' : '') +
+      ' onclick="fm.color=\'' + COLORS[c][0] + '\';renderFm()"></button>';
+  document.getElementById('fmColors').innerHTML = h;
+  var img = document.getElementById('fmIcon');
+  if (fmPendingUsb) img.src = '/api/usb_thumb?path=' + encodeURIComponent(fmPendingUsb);
+  else if (fmPendingFile && window.URL && URL.createObjectURL) img.src = URL.createObjectURL(fmPendingFile);
+  else if (fm.id) img.src = '/api/folder_icon?id=' + fm.id + '&v=' + Date.now();
+  else img.removeAttribute('src');
+  document.getElementById('fmIconHint').textContent = fmPendingUsb || fmPendingFile ? 'This picture is used when you save.'
+    : fm.custom ? 'Using your own picture.' : 'The first four games make up the picture, on the colour you pick.';
+  document.getElementById('fmCollage').style.display = fm.custom || fmPendingFile || fmPendingUsb ? '' : 'none';
+  var bg = document.getElementById('fmBg');
+  if (fm.bgUsb) bg.src = '/api/usb_thumb?path=' + encodeURIComponent(fm.bgUsb);
+  else if (fm.bgFile && window.URL && URL.createObjectURL) bg.src = URL.createObjectURL(fm.bgFile);
+  else if (fm.customBg && !fm.bgReset) bg.src = '/api/folder_bg?id=' + fm.id + '&v=' + Date.now();
+  else bg.removeAttribute('src');
+  document.getElementById('fmBgHint').textContent = fm.bgUsb || fm.bgFile ? 'This background is used when you save.'
+    : fm.bgReset ? 'The background is removed when you save.'
+    : fm.customBg ? 'Using your background.' : 'No background yet.';
+  document.getElementById('fmBgNone').style.display = fm.customBg || fm.bgUsb || fm.bgFile ? '' : 'none';
+  document.getElementById('fmBgFileRow').style.display = IS_PS5 ? 'none' : '';
+  renderPicker();
+}
+
+function pickable() {
+  var out = [];
+  for (var i = 0; i < tiles.length; i++) if (tiles[i].kind !== 'system') out.push(tiles[i]);
+  return out;
+}
+
+function renderPicker() {
+  if (!fm) return;
+  var list = pickable(), q = document.getElementById('fmQ').value.toLowerCase();
+  var F = [['all', 'All'], ['sel', 'In this folder'], ['games', 'Games tab'], ['media', 'Media tab']], h = '';
+  for (var i = 0; i < F.length; i++)
+    h += '<button class="chip' + (fmFilter === F[i][0] ? ' on' : '') + '" onclick="fmFilter=\'' + F[i][0] + '\';renderPicker()">' + F[i][1] + '</button>';
+  document.getElementById('fmChips').innerHTML = h;
+  h = '';
+  for (var k = 0; k < list.length; k++) {
+    var t = list[k], sel = fm.items.indexOf(t.id) >= 0;
+    if (fmFilter === 'sel' && !sel) continue;
+    if ((fmFilter === 'games' || fmFilter === 'media') && t.tab !== fmFilter) continue;
+    if (q && t.name.toLowerCase().indexOf(q) < 0 && t.id.toLowerCase().indexOf(q) < 0) continue;
+    var other = t.folder && t.folder !== fm.id ? '<span class="other">In ' + esc(folderName(t.folder)) + '</span>' : '';
+    h += '<button class="pickc' + (sel ? ' sel' : '') + '" onclick="togglePick(\'' + t.id + '\')">' +
+      '<span class="chk">&#10003;</span><span class="pin"><span class="icon" data-id="' + t.id + '">' + svg(GAME_ICON) + '</span>' +
+      '<span class="pn">' + esc(t.name) + '</span>' + other + '</span></button>';
+  }
+  document.getElementById('fmPick').innerHTML = h || '<div class="empty">Nothing here.</div>';
+  document.getElementById('fmCount').textContent = fm.items.length;
+  loadIcons();
+}
+
+function togglePick(id) {
+  var i = fm.items.indexOf(id);
+  if (i >= 0) fm.items.splice(i, 1); else fm.items.push(id);
+  var box = document.getElementById('fmPick'), scroll = box.scrollTop;
+  renderPicker();
+  box.scrollTop = scroll;
+  var again = box.querySelector('.icon[data-id="' + id + '"]');
+  while (again && again.tagName !== 'BUTTON') again = again.parentNode;
+  if (again && again.focus) again.focus();
+}
+
+function pickPicture() {
+  var f = document.getElementById('fmFile').files[0];
+  if (!f) return;
+  fmPendingFile = f;
+  fmPendingUsb = null;
+  renderFm();
+}
+
+/* ---- pictures on a USB drive ---- */
+
+var usbPics = [], thumbQueue = [], thumbBusy = 0;
+
+var picTarget = 'folder';  /* which picture the USB picker fills */
+var USB_HOMES = { folder: 'fmUsbHome', folderbg: 'fmBgUsbHome', tile: 'teUsbHome', tilebg: 'teBgUsbHome' };
+function pendingUsb() {
+  if (picTarget === 'tile') return te && te.usb;
+  if (picTarget === 'tilebg') return te && te.bgUsb;
+  if (picTarget === 'folderbg') return fm && fm.bgUsb;
+  return fmPendingUsb;
+}
+
+function toggleUsbPics(btn, target) {
+  target = target || 'folder';
+  var box = document.getElementById('usbPics'), home = document.getElementById(USB_HOMES[target]);
+  if (target !== picTarget || box.parentNode !== home) {
+    picTarget = target;
+    home.appendChild(box);
+    box.style.display = '';
+    loadUsbPics();
+    return;
+  }
+  if (box.style.display === 'none') { box.style.display = ''; loadUsbPics(); }
+  else box.style.display = 'none';
+}
+
+function loadUsbPics() {
+  document.getElementById('usbHint').innerHTML = '<span class="spin"></span>&nbsp; Looking for pictures on USB drives…';
+  document.getElementById('usbGrid').innerHTML = '';
+  req('GET', '/api/usb_images', function (j) {
+    if (!j.ok) { document.getElementById('usbHint').textContent = j.error; return; }
+    usbPics = j.images;
+    document.getElementById('usbHint').textContent = usbPics.length
+      ? usbPics.length + ' picture' + (usbPics.length === 1 ? '' : 's') + ' found. Pick one:'
+      : 'No pictures found. Copy PNG, JPG, BMP or GIF files to a USB drive (any folder), plug it into the PS5 and press Refresh. ' +
+        'Over FTP, you can put them in /data/homehider/pictures instead.';
+    renderUsbPics();
+  });
+}
+
+/* "PS5/CREATE/Screenshots/ASTRO's PLAYROOM" -> "ASTRO's PLAYROOM" */
+function shortFolder(f) {
+  var parts = f.split('/');
+  return parts[parts.length - 1] || f;
+}
+
+function renderUsbPics() {
+  var h = '';
+  for (var i = 0; i < usbPics.length; i++) {
+    var p = usbPics[i], sel = p.path === pendingUsb();
+    h += '<button class="pickc' + (sel ? ' sel' : '') + '" onclick="pickUsb(' + i + ')">' +
+      '<span class="chk">&#10003;</span><span class="pin"><span class="icon"><img alt="" data-thumb="' +
+      esc(p.path) + '"></span><span class="pn">' + esc(p.name) + '</span>' +
+      (p.folder ? '<span class="other" title="' + esc(p.folder) + '">' + esc(shortFolder(p.folder)) + '</span>' : '') + '</span></button>';
+  }
+  document.getElementById('usbGrid').innerHTML = h;
+  thumbQueue = [];
+  var imgs = document.querySelectorAll('#usbGrid img[data-thumb]');
+  for (var k = 0; k < imgs.length; k++) thumbQueue.push(imgs[k]);
+  pumpThumbs();
+}
+
+/* previews are made on the console one or two at a time */
+function pumpThumbs() {
+  while (thumbBusy < 2 && thumbQueue.length) {
+    var el = thumbQueue.shift();
+    thumbBusy++;
+    el.onload = function () { thumbBusy--; pumpThumbs(); };
+    el.onerror = function () { this.style.visibility = 'hidden'; thumbBusy--; pumpThumbs(); };
+    el.src = '/api/usb_thumb?path=' + encodeURIComponent(el.getAttribute('data-thumb'));
+  }
+}
+
+function markUsbPick(i) {
+  var btns = document.querySelectorAll('#usbGrid .pickc');
+  for (var k = 0; k < btns.length; k++) btns[k].className = 'pickc' + (k === i ? ' sel' : '');
+}
+
+function pickUsb(i) {
+  if (picTarget === 'tilebg') {
+    te.bgUsb = usbPics[i].path; te.bgFile = null; te.bgReset = false;
+    markUsbPick(i);
+    renderTe();
+    return;
+  }
+  if (picTarget === 'folderbg') {
+    fm.bgUsb = usbPics[i].path; fm.bgFile = null; fm.bgReset = false;
+    markUsbPick(i);
+    renderFm();
+    return;
+  }
+  if (picTarget === 'tile') {
+    te.usb = usbPics[i].path;
+    te.file = null;
+    te.reset = false;
+    markUsbPick(i);
+    renderTe();
+    return;
+  }
+  fmPendingUsb = usbPics[i].path;
+  fmPendingFile = null;
+  markUsbPick(i);
+  renderFm();
+}
+
+/* POST with an optional file body; long timeout (backgrounds take a while) */
+function post(url, file, cb) {
+  var x = new XMLHttpRequest();
+  x.open('POST', url, true);
+  x.timeout = 180000;
+  x.onload = function () { var j; try { j = JSON.parse(x.responseText); } catch (e) { j = { ok: false, error: 'HTTP ' + x.status }; } cb(j); };
+  x.onerror = x.ontimeout = function () { cb({ ok: false, error: 'Home Hider is not responding.' }); };
+  x.send(file || '');
+}
+
+function fmNoBg() {
+  fm.bgUsb = null; fm.bgFile = null;
+  document.getElementById('fmBgFile').value = '';
+  fm.bgReset = !!fm.customBg;
+  markUsbPick(-1);
+  renderFm();
+}
+
+function fmPickBgFile() {
+  var f = document.getElementById('fmBgFile').files[0];
+  if (!f) return;
+  fm.bgFile = f; fm.bgUsb = null; fm.bgReset = false;
+  renderFm();
+}
+
+function uploadPicture(id, file, cb) {
+  var x = new XMLHttpRequest();
+  x.open('POST', '/api/folders/icon?id=' + id, true);
+  x.timeout = 120000;
+  x.onload = function () { var j; try { j = JSON.parse(x.responseText); } catch (e) { j = { ok: false, error: 'HTTP ' + x.status }; } cb(j); };
+  x.onerror = x.ontimeout = function () { cb({ ok: false, error: 'The picture didn\'t reach Home Hider.' }); };
+  x.send(file);
+}
+
+function useCollage(btn) {
+  if (fmPendingFile || fmPendingUsb) {
+    fmPendingFile = null;
+    fmPendingUsb = null;
+    document.getElementById('fmFile').value = '';
+    markUsbPick(-1);
+    renderFm();
+    if (!fm.custom) return;
+  }
+  if (!fm.id) { renderFm(); return; }
+  busy(btn, true);
+  req('POST', '/api/folders/icon?id=' + fm.id + '&reset=1', function (j) {
+    busy(btn, false);
+    if (!j.ok) { fmMsg(esc(j.error)); return; }
+    fm.custom = false;
+    loadFolders(function () { if (fm) renderFm(); });
+  });
+}
+
+function saveFolder(btn) {
+  fm.name = document.getElementById('fmName').value.replace(/^\s+|\s+$/g, '');
+  if (!fm.name) { fmMsg('Give the folder a name first.'); document.getElementById('fmName').focus(); return; }
+  if (!fm.items.length) { fmMsg('Pick at least one game for the folder.'); return; }
+  busy(btn, true);
+  fmMsg('<span class="spin"></span>&nbsp; Saving the folder and adding its tile to the home screen. This can take a few seconds…', true);
+  var body = 'id=' + encodeURIComponent(fm.id) + '&name=' + encodeURIComponent(fm.name) + '&tab=' + fm.tab +
+    '&color=' + fm.color + '&items=' + encodeURIComponent(fm.items.join(','));
+  var x = new XMLHttpRequest();
+  x.open('POST', '/api/folders/save', true);
+  x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  x.timeout = 60000;
+  x.onload = function () {
+    var j; try { j = JSON.parse(x.responseText); } catch (e) { j = { ok: false, error: 'HTTP ' + x.status }; }
+    if (!j.ok) { busy(btn, false); fmMsg('Couldn\'t save the folder: ' + esc(j.error)); return; }
+    var done = function (extra) {
+      busy(btn, false);
+      closeFolder();
+      loadFolders(function () { loadList(); });
+      banner('info', 'Folder saved. ' + (j.note ? esc(j.note) + ' ' : '') + (extra || '') +
+        'The home screen picks it up after you <b>open and close any game or app</b>, or restart the PS5.');
+    };
+    var bgStep = function (extra) {
+      var after = function (r) { done(extra + (r.ok ? '' : esc(r.error) + ' ')); };
+      if (fm.bgUsb || fm.bgFile) fmMsg('<span class="spin"></span>&nbsp; Making the background. This can take up to 10 seconds…', true);
+      if (fm.bgUsb) post('/api/folders/bg?id=' + j.id + '&usb=' + encodeURIComponent(fm.bgUsb), null, after);
+      else if (fm.bgFile) post('/api/folders/bg?id=' + j.id, fm.bgFile, after);
+      else if (fm.bgReset) post('/api/folders/bg?id=' + j.id + '&reset=1', null, after);
+      else done(extra);
+    };
+    if (fmPendingUsb) req('POST', '/api/folders/icon?id=' + j.id + '&usb=' + encodeURIComponent(fmPendingUsb),
+      function (r) { bgStep(r.ok ? '' : esc(r.error) + ' '); });
+    else if (fmPendingFile) uploadPicture(j.id, fmPendingFile, function (r) { bgStep(r.ok ? '' : esc(r.error) + ' '); });
+    else bgStep('');
+  };
+  x.onerror = x.ontimeout = function () {
+    busy(btn, false);
+    fmMsg('Home Hider stopped responding while saving. Start it again from Payload Manager, then open ' +
+      '<b>Advanced &gt; Diagnostics</b> and send the log at the bottom.');
+  };
+  x.send(body);
+}
+
+/* ---------- name and picture of any tile ---------- */
+
+var te = null;
+
+function editTile(id) {
+  req('GET', '/api/custom?id=' + id, function (j) {
+    if (!j.ok) { banner('err', esc(j.error)); return; }
+    te = j.item;
+    te.usb = null; te.file = null; te.reset = false;
+    te.bgUsb = null; te.bgFile = null; te.bgReset = false;
+    document.getElementById('teClear').checked = false;
+    document.getElementById('teBgFile').value = '';
+    document.getElementById('teBgFileRow').style.display = IS_PS5 ? 'none' : '';
+    document.getElementById('teBgField').style.display = te.can_bg ? '' : 'none';
+    picTarget = 'tile';
+    document.getElementById('teUsbHome').appendChild(document.getElementById('usbPics'));
+    document.getElementById('usbPics').style.display = 'none';
+    document.getElementById('teFileRow').style.display = IS_PS5 ? 'none' : '';
+    document.getElementById('teFile').value = '';
+    var nm = document.getElementById('teName');
+    nm.value = te.name;
+    nm.disabled = !te.can_rename;
+    document.getElementById('teOrig').textContent = te.can_rename
+      ? (te.renamed ? 'Original name: ' + te.orig_name : '')
+      : 'This tile\'s name isn\'t stored where Home Hider can change it.';
+    document.getElementById('teOrigName').style.display = te.renamed ? '' : 'none';
+    document.getElementById('tePicField').style.display = te.can_icon ? '' : 'none';
+    teMsg('');
+    renderTe();
+    document.getElementById('mainView').style.display = 'none';
+    document.getElementById('editorView').style.display = 'none';
+    document.getElementById('tileView').style.display = '';
+    window.scrollTo(0, 0);
+    if (te.can_rename) nm.focus();
+  });
+}
+
+function teMsg(html, ok) {
+  var el = document.getElementById('teMsg');
+  el.innerHTML = html;
+  el.className = 'fm-msg' + (html ? ' show' : '') + (ok ? ' ok' : '');
+  if (html && el.scrollIntoView) el.scrollIntoView(false);
+}
+
+function renderTe() {
+  var img = document.getElementById('teIcon');
+  if (te.usb) img.src = '/api/usb_thumb?path=' + encodeURIComponent(te.usb);
+  else if (te.file && window.URL && URL.createObjectURL) img.src = URL.createObjectURL(te.file);
+  else if (te.reset) img.removeAttribute('src');
+  else img.src = iconUrl(te.id);
+  document.getElementById('teIconHint').textContent = te.usb || te.file ? 'This picture is used when you save.'
+    : te.reset ? 'The original picture comes back when you save.'
+    : te.custom_icon ? 'Using your own picture.' : 'The game\'s own picture.';
+  document.getElementById('teOrigPic').style.display = te.custom_icon || te.usb || te.file ? '' : 'none';
+  var bg = document.getElementById('teBg');
+  if (te.bgUsb) bg.src = '/api/usb_thumb?path=' + encodeURIComponent(te.bgUsb);
+  else if (te.bgFile && window.URL && URL.createObjectURL) bg.src = URL.createObjectURL(te.bgFile);
+  else if (te.custom_bg && !te.bgReset) bg.src = '/api/custom_bg?id=' + te.id + '&v=' + Date.now();
+  else bg.removeAttribute('src');
+  document.getElementById('teBgHint').textContent = te.bgUsb || te.bgFile ? 'This background is used when you save.'
+    : te.bgReset ? 'The original background comes back when you save.'
+    : te.custom_bg ? 'Using your background.' : 'The original background.';
+  document.getElementById('teOrigBg').style.display = te.custom_bg || te.bgUsb || te.bgFile ? '' : 'none';
+}
+
+function teOriginalBg() {
+  te.bgUsb = null; te.bgFile = null;
+  document.getElementById('teBgFile').value = '';
+  te.bgReset = !!te.custom_bg;
+  markUsbPick(-1);
+  renderTe();
+}
+
+function tePickBgFile() {
+  var f = document.getElementById('teBgFile').files[0];
+  if (!f) return;
+  te.bgFile = f; te.bgUsb = null; te.bgReset = false;
+  renderTe();
+}
+
+function teOriginalName() { document.getElementById('teName').value = te.orig_name; }
+
+function teOriginalPic() {
+  te.usb = null; te.file = null;
+  document.getElementById('teFile').value = '';
+  te.reset = !!te.custom_icon;
+  markUsbPick(-1);
+  renderTe();
+}
+
+function tePickFile() {
+  var f = document.getElementById('teFile').files[0];
+  if (!f) return;
+  te.file = f; te.usb = null; te.reset = false;
+  markUsbPick(-1);
+  renderTe();
+}
+
+function closeTile() {
+  document.getElementById('tileView').style.display = 'none';
+  document.getElementById('mainView').style.display = '';
+  te = null;
+  picTarget = 'folder';
+}
+
+function saveTile(btn) {
+  var name = document.getElementById('teName').value.replace(/^\s+|\s+$/g, '');
+  var steps = [];
+  if (te.can_rename && name !== te.name)
+    steps.push(function (next) {
+      var x = new XMLHttpRequest();
+      x.open('POST', '/api/custom/name?id=' + te.id + (name ? '' : '&reset=1'), true);
+      x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+      x.timeout = 30000;
+      x.onload = function () { var j; try { j = JSON.parse(x.responseText); } catch (e) { j = { ok: false, error: 'HTTP ' + x.status }; } next(j); };
+      x.onerror = x.ontimeout = function () { next({ ok: false, error: 'Home Hider is not responding.' }); };
+      x.send('name=' + encodeURIComponent(name));
+    });
+  var clear = document.getElementById('teClear').checked ? '&clear=1' : '';
+  if (te.usb) steps.push(function (next) { req('POST', '/api/custom/icon?id=' + te.id + clear + '&usb=' + encodeURIComponent(te.usb), next); });
+  else if (te.file) steps.push(function (next) {
+    var x = new XMLHttpRequest();
+    x.open('POST', '/api/custom/icon?id=' + te.id + clear, true);
+    x.timeout = 120000;
+    x.onload = function () { var j; try { j = JSON.parse(x.responseText); } catch (e) { j = { ok: false, error: 'HTTP ' + x.status }; } next(j); };
+    x.onerror = x.ontimeout = function () { next({ ok: false, error: 'The picture didn\'t reach Home Hider.' }); };
+    x.send(te.file);
+  });
+  else if (te.reset) steps.push(function (next) { req('POST', '/api/custom/icon?id=' + te.id + '&reset=1', next); });
+  var bgNote = function () { teMsg('<span class="spin"></span>&nbsp; Making the background. This can take up to 10 seconds…', true); };
+  if (te.bgUsb) steps.push(function (next) { bgNote(); post('/api/custom/bg?id=' + te.id + '&usb=' + encodeURIComponent(te.bgUsb), null, next); });
+  else if (te.bgFile) steps.push(function (next) { bgNote(); post('/api/custom/bg?id=' + te.id, te.bgFile, next); });
+  else if (te.bgReset) steps.push(function (next) { post('/api/custom/bg?id=' + te.id + '&reset=1', null, next); });
+  if (!steps.length) { closeTile(); return; }
+  busy(btn, true);
+  teMsg('<span class="spin"></span>&nbsp; Saving…', true);
+  var id = te.id, i = 0;
+  var run = function () {
+    if (i >= steps.length) {
+      busy(btn, false);
+      iconVer[id] = Date.now();
+      delete iconOk[id]; delete iconBad[id];
+      closeTile();
+      loadList(function () {
+        banner('info', 'Saved. The home screen shows the changes after it restarts.',
+          '<button class="ghost" onclick="reloadShell(this)">Refresh home screen now</button>');
+      });
+      return;
+    }
+    steps[i++](function (j) {
+      if (!j.ok) { busy(btn, false); teMsg(esc(j.error)); return; }
+      run();
+    });
+  };
+  run();
+}
+
+function deleteFolder(btn) {
+  confirmTwice(btn, 'Press again to delete', function () {
+    req('POST', '/api/folders/delete?id=' + fm.id, function (j) {
+      if (!j.ok) { fmMsg(esc(j.error)); return; }
+      closeFolder();
+      loadFolders(function () { loadList(); });
+      banner('info', esc(j.note));
+    });
+  });
+}
+
+function openFromHash() {
+  var m = location.hash.match(/^#folder=([A-Z0-9]{9})$/);
+  if (m) editFolder(m[1]);
+}
+
+loadStatus();
+loadFolders(function () { loadList(openFromHash); });
+
+loadUpd();
+setTimeout(loadUpd, 3000);
+</script>
+</body>
+</html>
