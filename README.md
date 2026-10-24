@@ -120,6 +120,8 @@ Home Hider comes with **[LiveShell Engine](https://github.com/ZiZc3/LiveShell) 1
 2. Add videos: copy `.mp4` files to a `liveshell` folder on a USB drive, or upload them from your phone or PC on LiveShell's page (`http://<PS5-IP>:9050`).
 3. Press **Use** on a video to make it your wallpaper. **Delete** removes a video from the PS5.
 
+**CHECK "Video + Icons" TO SEE SOME ICONS AND A LIVE WALLPAPER I MADE**
+
 | | |
 |---|---|
 | Videos | `.mp4`, H.264 or HEVC, 8-bit, up to 4K, with or without sound |
