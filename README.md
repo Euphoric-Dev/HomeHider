@@ -6,7 +6,7 @@
 Hide tiles, group games into folders, give any tile a new name, picture or background, and play a video as your wallpaper.
 
 ![PS5 payload](https://img.shields.io/badge/PS5-payload-0070d1)
-![Tested on FW 4.51](https://img.shields.io/badge/tested-FW%204.51-2ea44f)
+![Tested on FW 4.51 - 13.60](https://img.shields.io/badge/tested-FW%204.51-2ea44f)
 ![Version 2.0.0](https://img.shields.io/badge/version-2.0.0-7a4bf2)
 ![License GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-555)
 ![Runs with Payload Manager](https://img.shields.io/badge/runs%20with-Payload%20Manager-555)
