@@ -50,6 +50,8 @@ src/usbpics.c/.h    picture browser for USB drives and /data/homehider/pictures,
 src/launch.c/.h     starting titles: web link tiles, launch jobs, "another game running"
 src/custom.c/.h     renaming tiles, changing their pictures and backgrounds (app.db cells + appmeta files)
 src/texture.c/.h    background files: PNG/JPEG, DDS with BC7 (mode 6), BC1, BC3, RGBA8/BGRA8 and mips
+src/liveshell.c/.h  live wallpaper: starts the built-in LiveShell Engine, talks to its API on port 9050
+third_party/liveshell  LiveShell Engine 1.5.2 by ZiZc3 (GPL-3.0): liveshell.elf + its source, see NOTICE.md
 src/log.c/.h        log file shown in Diagnostics
 src/json.c/.h       small JSON reader for GitHub API replies
 src/sha256.c/.h     SHA-256 for download verification
@@ -110,6 +112,12 @@ The chosen picture is kept as a 3840x2160 JPEG in `/data/homehider/backgrounds/`
 
 Pictures are handled as RGBA throughout. Folder colour `none` keeps the collage or custom picture see-through (RGBA `icon0.png`). With a colour, the see-through parts are put on the colour's gradient when `icon0.png` is written. Tile pictures get a dark background unless `clear=1` is sent.
 
+### Live wallpaper (LiveShell Engine)
+
+[LiveShell Engine](https://github.com/ZiZc3/LiveShell) by ZiZc3 is built in unchanged. `make` turns `third_party/liveshell/liveshell.elf` into `src/liveshell_elf.h`, a byte array inside `HomeHider.elf`. With the `live` setting on, Home Hider sends those bytes to the ELF loader (port 9021), 3 seconds after it starts, unless LiveShell already answers on port 9050. That's the same as loading `liveshell.elf` from Payload Manager.
+
+The menu's Live wallpaper section goes through Home Hider (`/api/live`, `/api/live/power`, `/api/live/select`, `/api/live/delete`, `/api/live/thumb`). Home Hider forwards these to LiveShell's API on `127.0.0.1:9050`, so the menu works from a phone or PC too, and the POST requests get Home Hider's cross-site check. Videos are picked by path, and Home Hider turns the path into LiveShell's list index just before sending. Turning the feature off calls LiveShell's `/api/shutdown`. Everything else (looks, playlists, per-game videos, Discover, uploads) stays on LiveShell's own page. The tests use a fake LiveShell and a recording ELF loader, and check that the exact `liveshell.elf` bytes are sent. See `third_party/liveshell/NOTICE.md` for updating to a newer LiveShell.
+
 ### Menu at start
 
 **Options > When Home Hider starts** sets `open_browser`: `1` always opens the menu, `0` never does, and `2` is "quiet when started by Autoload". In mode `2`, Home Hider stays quiet on the first start after the console boots. It tells boots apart by `kern.boottime`, which it saves in `/data/homehider/last_boot.txt`. A later start in the same session opens the menu: launching again from Payload Manager also stops the copy that is already running, and either of those means a person started it. The decision is logged as `startup: menu mode ...`.
@@ -124,5 +132,7 @@ Pictures are handled as RGBA throughout. Folder colour `none` keeps the collage 
 Each original value goes to `state.db` (`custom_cells`) before it changes, and putting an original back only touches cells that still hold Home Hider's value. At start, `custom_reapply` re-points cells the console reset and rewrites a missing picture file from `/data/homehider/icons/`.
 
 The grey bar at the top of the folder page belongs to the PS5 browser. A web page can't remove it. The page asks for full screen on the first button press, which the browser may or may not allow.
+
+License: GPL-3.0 (see `LICENSE`), because Home Hider includes LiveShell Engine.
 
 Third-party code: [stb_image / stb_image_write](https://github.com/nothings/stb) (public domain) in `third_party/stb`. One line in `stb_image_write.h` (JPEG bit writer) is changed to keep a shift within `int` range; it is marked "Home Hider".

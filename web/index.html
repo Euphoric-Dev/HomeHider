@@ -149,6 +149,12 @@ details.sub summary{font-size:.85em;letter-spacing:1px}
 .pickc.sel .chk{display:flex}
 .pickc .other{font-size:.65em;color:#c9b6ff;display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .foot b{color:var(--text)}
+.live-now{font-size:.9em;margin-bottom:10px}
+.live-now b{color:var(--text)}
+.card.cur{border-color:var(--accent2);background:#16244a}
+.credit{color:var(--muted);font-size:.75em;margin-top:10px}
+.credit a{color:var(--muted)}
+.why{color:#ff9c95;font-size:.75em;margin-top:4px}
 .spin{display:inline-block;width:18px;height:18px;border:3px solid #ffffff55;border-top-color:#fff;
   border-radius:50%;animation:sp 1s linear infinite;vertical-align:-3px}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -174,6 +180,10 @@ details.sub summary{font-size:.85em;letter-spacing:1px}
     <button class="ghost small" onclick="editFolder(null)">+ New folder</button></div>
   <div id="folders"><div class="empty">Folders group games under one tile on your home screen.
     Press <b>New folder</b> to make one.</div></div>
+
+  <div class="sec-head"><h2>Live wallpaper</h2>
+    <button class="switch" id="sw_live" aria-label="Live wallpaper" onclick="toggleLive(this)"></button></div>
+  <div id="live"><div class="empty"><span class="spin"></span>&nbsp; Checking…</div></div>
 
   <h2>Games and apps</h2>
   <div class="toolbar">
@@ -1436,6 +1446,102 @@ function deleteFolder(btn) {
   });
 }
 
+/* ---------- live wallpaper: LiveShell Engine by ZiZc3 ---------- */
+
+var live = null, livePolls = 0;
+var FILM = '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9.5v5l4.5-2.5z" fill="#7aa2ff"/>';
+
+function loadLive() {
+  req('GET', '/api/live', function (j) {
+    if (!j.ok) { document.getElementById('live').innerHTML = '<div class="empty">' + esc(j.error) + '</div>'; return; }
+    live = j;
+    renderLive();
+    /* starting: check again until LiveShell answers */
+    if (j.enabled && !j.running && livePolls < 30) { livePolls++; setTimeout(loadLive, 2000); }
+    else if (j.running) livePolls = 0;
+  });
+}
+
+function liveAddr() { return 'http://' + (LOCAL ? '127.0.0.1' : location.hostname) + ':' + live.port + '/' + (LOCAL ? 'ps5' : ''); }
+
+function renderLive() {
+  var j = live, h = '';
+  setSwitch('sw_live', j.enabled);
+  var credit = '<div class="credit">Live wallpapers by <b>LiveShell Engine ' + esc(j.version) +
+    '</b> by ZiZc3 (<a href="https://github.com/ZiZc3/LiveShell">github.com/ZiZc3/LiveShell</a>, GPL-3.0), built on OnionHEN. Built into Home Hider.</div>';
+  if (!j.enabled) {
+    h = '<div class="row"><div class="txt">Play a video behind your home screen.' +
+      '<div class="hint">Turn this on to start LiveShell Engine, which comes built into Home Hider. It then starts with Home Hider every time.</div>' +
+      credit + '</div></div>';
+  } else if (!j.running) {
+    h = '<div class="row"><div class="txt"><span class="spin"></span>&nbsp; Starting LiveShell…' +
+      '<div class="hint">' + (livePolls >= 30 ? 'LiveShell hasn\'t started. Check that Payload Manager (and its ELF loader) is running, then switch Live wallpaper off and on again. Advanced &gt; Diagnostics shows the steps.'
+      : 'The wallpaper appears in a few seconds.') + '</div>' + credit + '</div></div>';
+  } else {
+    var st = j.state || {}, vids = st.videos || [], cur = '';
+    for (var i = 0; i < vids.length; i++) if (vids[i].path === st.current) cur = vids[i].name;
+    h = '<div class="live-now">' + (cur ? 'Playing: <b>' + esc(cur) + '</b>' : 'No video picked yet.') +
+      (st.status ? ' <span class="hint">(' + esc(st.status) + ')</span>' : '') + '</div>';
+    if (!vids.length) {
+      h += '<div class="empty">No videos yet. Add some (see below), then press Refresh.</div>';
+    } else {
+      h += '<div class="grid">';
+      for (var k = 0; k < vids.length; k++) {
+        var v = vids[k], on = v.path === st.current;
+        var badges = (v.res ? '<span class="badge b-sys">' + esc(v.res) + '</span> ' : '') +
+          (v.snd ? '<span class="badge b-sys">Sound</span> ' : '') + '<span class="badge b-sys">' + esc(v.where) + '</span>';
+        h += '<div class="card' + (on ? ' cur' : '') + '"><div class="icon" data-live="' + esc(v.path) + '">' + svg(FILM) + '</div>' +
+          '<div class="info"><div class="name">' + esc(v.name) + '</div>' + badges +
+          (v.why ? '<div class="why">' + esc(v.why) + '</div>' : '') + '</div><div class="btns">' +
+          (on ? '<span class="badge b-vis">Playing</span>' : '<button onclick="liveAct(\'select\',' + k + ',this)">Use</button>') +
+          (v.where === 'Internal' ? '<button class="ghost small" onclick="liveDelete(' + k + ',this)">Delete</button>' : '') +
+          '</div></div>';
+      }
+      h += '</div>';
+    }
+    h += '<div class="row" style="margin-top:12px"><div class="txt">Add videos' +
+      '<div class="hint">Copy <b>.mp4</b> files (H.264 or HEVC, up to 4K) to a <b>liveshell</b> folder on a USB drive, or upload them from your phone or PC at <b>http://' +
+      esc(st.ip || 'PS5-IP') + ':' + j.port + '</b>.</div></div>' +
+      '<button class="ghost small" onclick="loadLive()">Refresh</button></div>' +
+      '<div class="row"><div class="txt">More LiveShell settings<div class="hint">Looks, sound, playlists, a video per game, and Discover (download wallpapers).</div></div>' +
+      '<a class="btn ghost small" href="' + liveAddr() + '"' + (LOCAL ? '' : ' target="_blank"') + '>Open LiveShell</a></div>' + credit;
+  }
+  document.getElementById('live').innerHTML = h;
+  /* previews LiveShell has made */
+  var icons = document.querySelectorAll('#live .icon[data-live]');
+  for (var n = 0; n < icons.length; n++) (function (el) {
+    var img = new Image();
+    img.onload = function () { el.innerHTML = ''; el.appendChild(img); };
+    img.src = '/api/live/thumb?path=' + encodeURIComponent(el.getAttribute('data-live'));
+  })(icons[n]);
+}
+
+function toggleLive(btn) {
+  var on = !(live && live.enabled);
+  busy(btn, true);
+  req('POST', '/api/live/power?on=' + (on ? 1 : 0), function (j) {
+    busy(btn, false);
+    if (!j.ok) { banner('err', esc(j.error)); return; }
+    banner('info', esc(j.note));
+    livePolls = 0;
+    loadLive();
+  });
+}
+
+function liveAct(what, k, btn) {
+  var v = live.state.videos[k];
+  busy(btn, true);
+  req('POST', '/api/live/' + what + '?path=' + encodeURIComponent(v.path), function (j) {
+    busy(btn, false);
+    if (!j.ok) { banner('err', esc(j.error)); return; }
+    loadLive();
+  });
+}
+
+function liveDelete(k, btn) {
+  confirmTwice(btn, 'Press again', function () { liveAct('delete', k, btn); });
+}
+
 function openFromHash() {
   var m = location.hash.match(/^#folder=([A-Z0-9]{9})$/);
   if (m) editFolder(m[1]);
@@ -1443,6 +1549,7 @@ function openFromHash() {
 
 loadStatus();
 loadFolders(function () { loadList(openFromHash); });
+loadLive();
 
 loadUpd();
 setTimeout(loadUpd, 3000);

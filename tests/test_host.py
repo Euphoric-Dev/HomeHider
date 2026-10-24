@@ -1321,6 +1321,175 @@ def background_tests(tmp):
     s.stop()
 
 
+class FakeLiveShell:
+    """Plays LiveShell's web API (port 9050 on the console)."""
+
+    def __init__(self, port):
+        self.port = port
+        self.calls = []
+        self.videos = [
+            {"name": "ocean.mp4", "where": "Internal", "path": "/data/LiveShell/video/ocean.mp4", "res": "FHD",
+             "snd": False, "why": "", "size": 1000, "thumb": True, "fav": False, "k4": False},
+            {"name": "city night.mp4", "where": "USB 1", "path": "/mnt/usb0/liveshell/city night.mp4", "res": "4K",
+             "snd": True, "why": "", "size": 2000, "thumb": False, "fav": False, "k4": True},
+        ]
+        self.current = self.videos[0]["path"]
+        outer = self
+
+        class H(httpserver.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def reply(self, code, body, ctype="application/json"):
+                b = body if isinstance(body, bytes) else body.encode()
+                self.send_response(code)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(b)))
+                self.end_headers()
+                self.wfile.write(b)
+
+            def do_GET(self):
+                path, _, query = self.path.partition("?")
+                qs = urllib.parse.parse_qs(query)
+                i = int(qs.get("i", ["-1"])[0])
+                outer.calls.append(self.path)
+                if path == "/api/state":
+                    self.reply(200, json.dumps({"enabled": True, "status": "playing", "ip": "192.168.1.50",
+                                                "port": 9050, "current": outer.current, "videos": outer.videos}))
+                elif path == "/api/select" and 0 <= i < len(outer.videos):
+                    outer.current = outer.videos[i]["path"]
+                    self.reply(200, '{"ok":true}')
+                elif path == "/api/delete" and 0 <= i < len(outer.videos):
+                    if outer.videos[i]["where"] != "Internal":
+                        self.reply(200, '{"ok":false,"error":"Videos on USB are deleted on the drive"}')
+                    else:
+                        outer.videos.pop(i)
+                        self.reply(200, '{"ok":true}')
+                elif path == "/thumb" and i == 0:
+                    self.reply(200, tiny_png(16, 9, (10, 120, 200)), "image/png")
+                elif path == "/api/shutdown":
+                    self.reply(200, '{"ok":true}')
+                    threading.Thread(target=outer.stop, daemon=True).start()
+                else:
+                    self.reply(404, "")
+
+        socketserver.TCPServer.allow_reuse_address = True
+        self.srv = socketserver.ThreadingTCPServer(("127.0.0.1", port), H)
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+
+    def stop(self):
+        self.srv.shutdown()
+        self.srv.server_close()
+
+
+class RecordingLoader:
+    """An ELF loader that only records what it is sent."""
+
+    def __init__(self, port):
+        self.received = []
+        self.sock = socket.socket()
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock.bind(("127.0.0.1", port))
+        self.sock.listen(4)
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def _run(self):
+        while True:
+            try:
+                c, _ = self.sock.accept()
+            except OSError:
+                return
+            data = b""
+            while True:
+                chunk = c.recv(65536)
+                if not chunk:
+                    break
+                data += chunk
+            c.close()
+            self.received.append(data)
+
+    def close(self):
+        self.sock.close()
+
+
+def live_tests(tmp):
+    print("live wallpaper (built-in LiveShell Engine)")
+    appdb = os.path.join(tmp, "live.db")
+    data = os.path.join(tmp, "live-data")
+    make_db(appdb)
+    elf = open(os.path.join(os.path.dirname(BIN), "..", "..", "third_party", "liveshell", "liveshell.elf"), "rb").read()
+    lport, aport = 19121, 19050
+    loader = RecordingLoader(lport)
+    env = {"HH_LOADER_PORT": str(lport), "HH_LIVESHELL_PORT": str(aport)}
+
+    s = Server(appdb, data, env)
+    code, j = http("GET", "/api/live")
+    check(code == 200 and not j["enabled"] and not j["running"] and j["version"] == "1.5.2", "off by default")
+    time.sleep(0.5)
+    check(loader.received == [], "LiveShell not started while it's off")
+    d = http("GET", "/api/diag", raw=True)[1].decode()
+    check("LiveShell 1.5.2 built in: %d bytes, sha256 %s" % (len(elf), hashlib.sha256(elf).hexdigest()) in d,
+          "Diagnostics names the built-in LiveShell and its checksum")
+
+    print("  turning it on starts the built-in LiveShell")
+    code, r = http("POST", "/api/live/power?on=1")
+    check(code == 200 and "Starting" in r["note"], "switched on")
+    check(wait_for(lambda: len(loader.received) == 1), "liveshell.elf handed to the ELF loader")
+    check(loader.received[0] == elf, "byte for byte the original liveshell.elf")
+    code, j = http("GET", "/api/live")
+    check(j["enabled"] and not j["running"] and j["state"] is None, "reported as starting until LiveShell answers")
+
+    print("  menu works through LiveShell's API")
+    fake = FakeLiveShell(aport)
+    code, j = http("GET", "/api/live")
+    check(j["running"] and j["state"]["current"] == "/data/LiveShell/video/ocean.mp4" and len(j["state"]["videos"]) == 2,
+          "status and videos come from LiveShell")
+    code, r = http("POST", "/api/live/select?path=" + urllib.parse.quote("/mnt/usb0/liveshell/city night.mp4"))
+    check(code == 200 and "/api/select?i=1" in fake.calls and fake.current.endswith("city night.mp4"),
+          "picking a video tells LiveShell (by its place in LiveShell's list)")
+    code, r = http("POST", "/api/live/select?path=" + urllib.parse.quote("/etc/passwd"))
+    check(code == 404 and not any("i=-1" in c for c in fake.calls), "unknown video refused, nothing sent")
+    code, png = http("GET", "/api/live/thumb?path=" + urllib.parse.quote("/data/LiveShell/video/ocean.mp4"), raw=True)
+    check(code == 200 and png[:4] == b"\x89PNG", "LiveShell's preview picture passed on")
+    code, png = http("GET", "/api/live/thumb?path=" + urllib.parse.quote("/mnt/usb0/liveshell/city night.mp4"), raw=True)
+    check(code == 404, "no preview -> 404")
+    code, r = http("POST", "/api/live/delete?path=" + urllib.parse.quote("/mnt/usb0/liveshell/city night.mp4"))
+    check(code == 409 and "USB" in r["error"], "LiveShell's own error passed on")
+    code, r = http("POST", "/api/live/delete?path=" + urllib.parse.quote("/data/LiveShell/video/ocean.mp4"))
+    check(code == 200 and len(fake.videos) == 1, "video deleted")
+    evil = urllib.request.Request(BASE + "/api/live/power?on=0", method="POST", data=b"",
+                                  headers={"Origin": "http://evil.example"})
+    try:
+        urllib.request.urlopen(evil, timeout=5)
+        code = 200
+    except urllib.error.HTTPError as e:
+        code = e.code
+    check(code == 403, "other web sites can't switch it")
+
+    print("  starts with Home Hider, but never twice")
+    s.stop()
+    s = Server(appdb, data, env)
+    time.sleep(4.5)
+    check(len(loader.received) == 1, "already running: not loaded again")
+    s.stop()
+    fake.stop()
+    s = Server(appdb, data, env)
+    check(wait_for(lambda: len(loader.received) == 2, 10), "not running at start: started again (setting kept)")
+
+    print("  turning it off")
+    fake = FakeLiveShell(aport)
+    code, r = http("POST", "/api/live/power?on=0")
+    check(code == 200 and "/api/shutdown" in fake.calls, "LiveShell asked to stop")
+    check(not http("GET", "/api/live")[1]["enabled"], "setting off")
+    code, r = http("POST", "/api/live/select?path=x")
+    check(code in (404, 409), "nothing to pick while it's off")
+    menu = http("GET", "/", raw=True)[1]
+    check(b"LiveShell Engine" in menu and b"ZiZc3" in menu and b"github.com/ZiZc3/LiveShell" in menu,
+          "menu credits LiveShell and its author")
+    s.stop()
+    loader.close()
+
+
 def glob_elves(root):
     out = []
     for d, _, files in os.walk(root):
@@ -1552,6 +1721,7 @@ def main():
         startup_mode_tests(tmp)
         custom_tests(tmp)
         background_tests(tmp)
+        live_tests(tmp)
         updater_tests(tmp)
         print("\nALL %d CHECKS PASSED" % passed)
     finally:

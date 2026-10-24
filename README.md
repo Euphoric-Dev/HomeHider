@@ -2,12 +2,13 @@
 
 # Home Hider
 
-**Make the PS5 home screen yours.**
-Hide tiles, group games into folders, and give any tile a new name, picture or background.
+**Make the PS5 home screen yours. One payload for all of it.**
+Hide tiles, group games into folders, give any tile a new name, picture or background, and play a video as your wallpaper.
 
 ![PS5 payload](https://img.shields.io/badge/PS5-payload-0070d1)
 ![Tested on FW 4.51](https://img.shields.io/badge/tested-FW%204.51-2ea44f)
-![Version 1.0.0](https://img.shields.io/badge/version-1.0.0-7a4bf2)
+![Version 2.0.0](https://img.shields.io/badge/version-2.0.0-7a4bf2)
+![License GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-555)
 ![Runs with Payload Manager](https://img.shields.io/badge/runs%20with-Payload%20Manager-555)
 
 </div>
@@ -21,9 +22,6 @@ Home Hider is a payload (`.elf`) for jailbroken PS5 consoles. Start it from **Pa
 
 Nothing is ever deleted. Hidden games still work, and every change can be undone.
 
-> [!IMPORTANT]
-> **DISCLAIMER: THIS WAS MADE WITH AI**
-
 ## Features
 
 | | |
@@ -33,6 +31,7 @@ Nothing is ever deleted. Hidden games still work, and every change can be undone
 | **Rename** | Give any tile the name you want. |
 | **Custom pictures** | Replace any tile's icon. Transparent PNGs work too. |
 | **Custom backgrounds** | Replace the big background shown when a tile is selected, for games, apps and folders. |
+| **Live wallpaper** | Play a video behind the home screen, powered by the built-in [LiveShell Engine](https://github.com/ZiZc3/LiveShell) by ZiZc3. |
 | **Open anything** | Start any game or app from the menu, including hidden ones and web apps such as Payload Manager. |
 | **Keeps itself right** | If the PS5 brings back a tile, name, picture or background, Home Hider puts your choice back the next time it runs. |
 | **Quiet Autoload** | Runs silently when Payload Manager's Autoload starts it, and opens the menu when you launch it yourself. |
@@ -110,6 +109,23 @@ Each part has a **Use the original** button. The game's own files are never touc
 
 </details>
 
+## Live wallpaper
+
+Home Hider comes with **[LiveShell Engine](https://github.com/ZiZc3/LiveShell) 1.5.2 by ZiZc3** built in, so one payload gives you video wallpapers too. You don't need to load `liveshell.elf` separately.
+
+1. In the menu, switch **Live wallpaper** on. Home Hider starts LiveShell, and from then on starts it every time Home Hider runs.
+2. Add videos: copy `.mp4` files to a `liveshell` folder on a USB drive, or upload them from your phone or PC on LiveShell's page (`http://<PS5-IP>:9050`).
+3. Press **Use** on a video to make it your wallpaper. **Delete** removes a video from the PS5.
+
+| | |
+|---|---|
+| Videos | `.mp4`, H.264 or HEVC, 8-bit, up to 4K, with or without sound |
+| More settings | **Open LiveShell** opens LiveShell's own page: looks, sound, playlists, a video for each game, and Discover (download wallpapers) |
+| Turning it off | Switch **Live wallpaper** off. LiveShell stops, and the home screen restarts with its normal background. |
+
+> [!NOTE]
+> If you already load `liveshell.elf` from Payload Manager, Home Hider sees that it's running and doesn't start a second copy. LiveShell's files are in `/data/LiveShell/`.
+
 ## Run it automatically
 
 Add Home Hider to Payload Manager's Autoload so folders always work and your changes are kept:
@@ -154,6 +170,8 @@ The first-run backup of the home-screen database is kept in `/data/homehider/bac
 | "Choose from USB drive" finds nothing | Use exFAT or FAT32, keep pictures within four folders of the top, and press **Refresh**. |
 | A background "can't be written yet" | That game uses an unusual texture format. |
 | "Port 8090 is busy" | Restart the PS5 and launch Home Hider again. |
+| The video stops after **Refresh home screen now** | Switch **Live wallpaper** off and on again. |
+| Live wallpaper says "Starting" and nothing happens | Check that Payload Manager's ELF loader is running, then switch Live wallpaper off and on. If LiveShell itself shows an error, see its log in `/data/LiveShell/liveshell.log`. |
 | Anything else | **Advanced > Diagnostics** shows a log of every step. Please include it when you open an issue. |
 
 </details>
@@ -167,7 +185,7 @@ The first-run backup of the home-screen database is kept in `/data/homehider/bac
 
 **Do changes survive without the jailbreak?** Yes. Only a system update or Rebuild Database can undo them, and Home Hider puts them back the next time it runs.
 
-**Can GIFs or backgrounds animate?** No. The home screen only shows still pictures.
+**Can GIFs or backgrounds animate?** Tile pictures and backgrounds are still pictures. For a moving wallpaper, use [Live wallpaper](#live-wallpaper).
 
 **Why can't Game Library and App Library be hidden?** The home screen adds those two tiles itself.
 
@@ -181,10 +199,15 @@ See [BUILDING.md](BUILDING.md). It covers the PS5 build, the desktop test suite 
 
 ## Credits
 
+- **[LiveShell Engine](https://github.com/ZiZc3/LiveShell) by ZiZc3**: the live wallpaper engine, built into Home Hider unchanged (GPL-3.0). LiveShell's own credits: [OnionHEN](https://github.com/aydencharles/onionHEN) (payload injector, detour library and ShellUI groundwork) and the PS5 Payload SDK.
 - [ps5-payload-sdk](https://github.com/ps5-payload-dev/sdk) by John Törnblom
 - [Payload Manager](https://github.com/itsPLK/ps5-payload-manager) by itsPLK
 - Home-screen research: [PS5-TabShifter](https://github.com/xvvulcanvx/PS5-TabShifter), [psgfx](https://github.com/elripalda/psgfx), [PS5 Art Swap](https://github.com/griches/PS5_ArtSwap) and the [PS5 Developer Wiki](https://www.psdevwiki.com/ps5/Title_ID)
 - [SQLite](https://sqlite.org) and [stb](https://github.com/nothings/stb) (public domain)
+
+## License
+
+Home Hider is free software under the **GNU General Public License v3.0** (see [LICENSE](LICENSE)). It includes LiveShell Engine, which is GPL-3.0. LiveShell's source code is in [`third_party/liveshell/source`](third_party/liveshell/source), and its project lives at [github.com/ZiZc3/LiveShell](https://github.com/ZiZc3/LiveShell).
 
 <div align="center">
 <sub>Use at your own risk. Home Hider only changes the home-screen layout, keeps backups, and can undo everything it does.</sub>

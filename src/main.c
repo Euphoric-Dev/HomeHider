@@ -23,7 +23,9 @@
 #include "hider.h"
 #include "custom.h"
 #include "http.h"
+#include "json.h"
 #include "launch.h"
+#include "liveshell.h"
 #include "platform.h"
 #include "strbuf.h"
 #include "folder_html.h"
@@ -52,10 +54,11 @@ typedef struct {
                          start after boot (Autoload), menu on later starts */
   int  reapply;       /* re-hide tiles the system brought back, at launch */
   int  auto_check;    /* look for updates (GitHub/USB) at launch */
+  int  live;          /* start LiveShell (live wallpaper) with Home Hider */
   char repo[128];     /* GitHub "owner/name" for updates */
 } settings_t;
 
-static settings_t g_cfg = {1, 1, 1, HH_DEFAULT_REPO};
+static settings_t g_cfg = {1, 1, 1, 0, HH_DEFAULT_REPO};
 static char g_pldmgr_dir[256];
 static char g_usb_fmt[256];
 static char g_github_api[128];
@@ -126,6 +129,7 @@ static void load_settings(void) {
     if (sscanf(line, "open_browser=%d", &v) == 1) g_cfg.open_browser = v == 2 ? 2 : v ? 1 : 0;
     if (sscanf(line, "reapply=%d", &v) == 1) g_cfg.reapply = v ? 1 : 0;
     if (sscanf(line, "auto_check=%d", &v) == 1) g_cfg.auto_check = v ? 1 : 0;
+    if (sscanf(line, "live=%d", &v) == 1) g_cfg.live = v ? 1 : 0;
     if (!strncmp(line, "repo=", 5) && strlen(line + 5) < sizeof(g_cfg.repo) &&
         upd_valid_repo(line + 5))
       memcpy(g_cfg.repo, line + 5, strlen(line + 5) + 1);
@@ -138,8 +142,8 @@ static int save_settings(void) {
   snprintf(tmp, sizeof(tmp), "%s.tmp", g_settings);
   FILE *f = fopen(tmp, "w");
   if (!f) return -1;
-  fprintf(f, "open_browser=%d\nreapply=%d\nauto_check=%d\nrepo=%s\n",
-          g_cfg.open_browser, g_cfg.reapply, g_cfg.auto_check, g_cfg.repo);
+  fprintf(f, "open_browser=%d\nreapply=%d\nauto_check=%d\nlive=%d\nrepo=%s\n",
+          g_cfg.open_browser, g_cfg.reapply, g_cfg.auto_check, g_cfg.live, g_cfg.repo);
   fclose(f);
   return rename(tmp, g_settings);
 }
@@ -309,6 +313,111 @@ static void handle_launch_status(int fd, const char *query) {
   sb_free(&sb);
 }
 
+/* ---- live wallpaper (LiveShell Engine by ZiZc3) ---- */
+
+static volatile int g_live_starting = 0;
+
+static void *live_start_later(void *arg) {
+  int delay = (int)(long)arg;
+  if (delay) sleep((unsigned)delay); /* let Autoload finish loading other payloads */
+  if (!live_running()) live_start();
+  g_live_starting = 0;
+  return NULL;
+}
+
+static void live_start_async(int delay) {
+  if (g_live_starting) return;
+  g_live_starting = 1;
+  pthread_t t;
+  if (pthread_create(&t, NULL, live_start_later, (void *)(long)delay) == 0) pthread_detach(t);
+  else g_live_starting = 0;
+}
+
+static void handle_live(int fd) {
+  char *state = NULL;
+  size_t n = 0;
+  int st = live_get("/api/state", &state, &n);
+  strbuf_t sb;
+  sb_init(&sb);
+  sb_printf(&sb, "{\"ok\":true,\"enabled\":%s,\"running\":%s,\"starting\":%s,\"version\":\"%s\",\"port\":9050,\"state\":",
+            g_cfg.live ? "true" : "false", st == 200 ? "true" : "false", g_live_starting ? "true" : "false",
+            LIVESHELL_VERSION);
+  if (st == 200 && state && state[0] == '{') sb_puts(&sb, state);
+  else sb_puts(&sb, "null");
+  sb_puts(&sb, "}");
+  free(state);
+  send_json(fd, 200, &sb);
+  sb_free(&sb);
+}
+
+/* Passes LiveShell's {"ok":..,"error":..} answer on. */
+static void live_forward(int fd, const char *path) {
+  char *b = NULL;
+  size_t n = 0;
+  int st = live_get(path, &b, &n);
+  if (st < 0) send_error(fd, 409, "LiveShell isn't running. Turn Live wallpaper on first.");
+  else if (st != 200 || !b || b[0] != '{') send_error(fd, 409, "LiveShell didn't accept that.");
+  else if (strstr(b, "\"ok\":true")) send_ok(fd, "done");
+  else {
+    /* its own error text */
+    json_tok_t t[16];
+    int nt = json_parse(b, n, t, 16);
+    char msg[300] = "LiveShell didn't accept that.";
+    if (nt > 0) json_str(b, t, json_get(b, t, nt, 0, "error"), msg, sizeof(msg));
+    send_error(fd, 409, msg);
+  }
+  free(b);
+}
+
+static void handle_live_video(int fd, const char *query, const char *what) {
+  char path[1024] = "", url[64];
+  if (http_query_get(query, "path", path, sizeof(path)) || !path[0]) {
+    send_error(fd, 400, "Missing video.");
+    return;
+  }
+  int i = live_video_index(path);
+  if (i < 0) {
+    send_error(fd, 404, live_running() ? "That video isn't in LiveShell's list any more." :
+                                         "LiveShell isn't running. Turn Live wallpaper on first.");
+    return;
+  }
+  snprintf(url, sizeof(url), "/api/%s?i=%d", what, i);
+  hh_log("live wallpaper: %s %s", what, path);
+  live_forward(fd, url);
+}
+
+static void handle_live_power(int fd, const char *query) {
+  char v[8] = "";
+  http_query_get(query, "on", v, sizeof(v));
+  g_cfg.live = atoi(v) ? 1 : 0;
+  save_settings();
+  if (g_cfg.live) {
+    if (live_running()) {
+      send_ok(fd, "Live wallpaper is on.");
+      return;
+    }
+    live_start_async(0);
+    send_ok(fd, "Starting LiveShell. The wallpaper appears in a few seconds.");
+  } else {
+    if (live_running()) live_stop();
+    send_ok(fd, "Live wallpaper is off. The home screen restarts with its normal background.");
+  }
+}
+
+static void handle_live_thumb(int fd, const char *query) {
+  char path[1024] = "", url[64];
+  http_query_get(query, "path", path, sizeof(path));
+  int i = path[0] ? live_video_index(path) : -1;
+  char *b = NULL;
+  size_t n = 0;
+  snprintf(url, sizeof(url), "/thumb?i=%d", i);
+  if (i >= 0 && live_get(url, &b, &n) == 200 && n > 8 && !memcmp(b, "\x89PNG", 4))
+    http_send(fd, 200, "image/png", b, n, "Cache-Control: max-age=300\r\n");
+  else
+    http_send_text(fd, 404, "text/plain", "no preview");
+  free(b);
+}
+
 /* ---- USB pictures ---- */
 
 static void handle_usb_images(int fd) {
@@ -408,6 +517,13 @@ static void handle_diag(int fd) {
   sb_printf(&sb, "\nBackups: original=%s last-launch=%s\n",
             file_exists(g_backup_orig) ? "yes" : "no",
             file_exists(g_backup_launch) ? "yes" : "no");
+  {
+    char hex[65];
+    live_elf_sha256(hex);
+    sb_printf(&sb, "LiveShell %s built in: %zu bytes, sha256 %s; live wallpaper %s, %s\n",
+              LIVESHELL_VERSION, live_elf_size(), hex, g_cfg.live ? "on" : "off",
+              live_running() ? "running" : "not running");
+  }
   sb_puts(&sb, "\n== Log (newest last) ==\n");
   hh_log_tail(&sb, 12000);
   if (sb.oom) http_send_text(fd, 500, "text/plain", "out of memory");
@@ -916,6 +1032,10 @@ static void handle_client(int fd) {
     handle_custom_bg_get(fd, r.query);
   } else if (!strcmp(p, "/api/folder_bg")) {
     handle_folder_bg_get(fd, r.query);
+  } else if (!strcmp(p, "/api/live")) {
+    handle_live(fd);
+  } else if (!strcmp(p, "/api/live/thumb")) {
+    handle_live_thumb(fd, r.query);
   } else if (!strcmp(p, "/api/launch_status")) {
     handle_launch_status(fd, r.query);
   } else if (!strcmp(p, "/api/update/status")) {
@@ -957,6 +1077,12 @@ static void handle_client(int fd) {
     send_ok(fd, "logged");
   } else if (!strcmp(p, "/api/launch")) {
     handle_launch(fd, r.query);
+  } else if (!strcmp(p, "/api/live/power")) {
+    handle_live_power(fd, r.query);
+  } else if (!strcmp(p, "/api/live/select")) {
+    handle_live_video(fd, r.query, "select");
+  } else if (!strcmp(p, "/api/live/delete")) {
+    handle_live_video(fd, r.query, "delete");
   } else if (!strcmp(p, "/api/unhide_all")) {
     handle_unhide_all(fd);
   } else if (!strcmp(p, "/api/settings")) {
@@ -1064,6 +1190,13 @@ int main(void) {
   launch_init(&lcfg);
   custom_cfg_t ccfg = {g_data_dir, g_appmeta_dir};
   custom_init(&ccfg);
+  {
+    live_cfg_t lv = {g_loader_port, 9050};
+#ifdef HH_HOST
+    if (getenv("HH_LIVESHELL_PORT")) lv.api_port = atoi(getenv("HH_LIVESHELL_PORT"));
+#endif
+    live_init(&lv);
+  }
 
   /* safety copies of the home screen database */
   char err[256] = "";
@@ -1122,6 +1255,9 @@ int main(void) {
     plat_notify("Home Hider %s running on port %d", HH_VERSION, HH_PORT);
 
   if (g_cfg.auto_check && !just_updated) upd_start_check(g_cfg.repo[0] != '\0', 1, 1);
+
+  /* live wallpaper: start the built-in LiveShell unless it is already running */
+  if (g_cfg.live) live_start_async(just_updated ? 0 : 3);
 
   int first_boot_start = first_start_since_boot();
   int open_menu = !just_updated &&

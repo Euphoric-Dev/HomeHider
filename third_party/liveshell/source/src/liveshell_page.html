@@ -1,0 +1,767 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LiveShell Engine</title>
+<link rel="icon" href="/icon.png">
+<style>
+:root{--card:#151515;--card2:#1e1e1e;--chip:#262626;--line:#2e2e2e;--text:#fff;--dim:#8f8f8f;--faint:#4a4a4a}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{color:var(--text);font-family:"SST","SST Pro","Helvetica Neue",Helvetica,Arial,sans-serif;line-height:1.3}
+/* Solid black: the see-through frosted look came out grey on the PS5. */
+html,body{background:#000}
+body{position:relative;padding:0 36px 72px;min-height:100vh;overflow-x:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:left}
+button:focus{outline:none}
+
+/* controller keys, drawn the same everywhere */
+.k{display:inline-block;min-width:28px;text-align:center;font-style:normal;font-size:12px;font-weight:700;letter-spacing:.3px;color:#cfcfcf;border:1px solid #5a5a5a;border-radius:6px;padding:3px 7px}
+
+/* top bar: name left, big tabs in the middle, wallpaper state right */
+.top{display:flex;align-items:center;gap:20px;height:88px}
+.brand{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600;letter-spacing:-.3px;white-space:nowrap}
+.brand img{width:34px;height:34px;border-radius:8px}
+.brand small{font-size:12px;font-weight:400;color:var(--dim)}
+.tabs{display:flex;align-items:center;gap:4px;margin:0 auto;padding:5px 8px;border-radius:999px;background:var(--card)}
+.tabs .k{margin:0 6px}
+.tab{display:flex;align-items:center;gap:10px;padding:11px 22px 11px 18px;border-radius:999px;color:#b8b8b8;font-size:18px;font-weight:500;white-space:nowrap;transition:background .15s,color .15s}
+.tab svg{width:20px;height:20px;flex:none;pointer-events:none}
+.tab span{pointer-events:none}
+.tab.on{background:var(--text);color:#000;font-weight:700}
+.tab:focus{box-shadow:0 0 0 2px #000,0 0 0 4px var(--text)}
+.live{display:flex;flex-direction:column;align-items:flex-end;gap:3px;white-space:nowrap}
+.live .l1{display:flex;align-items:center;gap:8px;font-size:15px}
+.live .l2{font-size:12px;color:var(--dim)}
+.live .l2 b{color:#cfcfcf;font-weight:600}
+.sw{flex:none;width:40px;height:23px;border-radius:12px;background:var(--chip);box-shadow:inset 0 0 0 1px var(--line);position:relative;transition:background .2s}
+.sw:after{content:"";position:absolute;top:3px;left:3px;width:17px;height:17px;border-radius:50%;background:var(--dim);transition:transform .2s,background .2s}
+
+h2{display:flex;align-items:baseline;gap:10px;font-size:19px;font-weight:600;margin:18px 0 10px}
+h2 span{font-size:14px;color:var(--dim);font-weight:400}
+/* two columns: banner + list on the left, the settings panel on the right */
+.cols{display:flex;align-items:flex-start;gap:24px}
+.left{flex:1;min-width:0}
+.side{flex:none;width:320px;position:sticky;top:10px;max-height:calc(100vh - 84px);overflow:auto}
+
+/* right panel: an accordion - one section open at a time; a closed one shows its current value */
+.look{background:var(--card);border-radius:14px;padding:6px 16px}
+.look h4{flex:1;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim)}
+.sec+.sec{border-top:1px solid var(--line)}
+.acc{display:flex;align-items:center;gap:10px;width:calc(100% + 16px);margin:4px -8px;padding:11px 8px;border-radius:10px;text-align:left;transition:background .2s}
+.acc:focus{box-shadow:0 0 0 2px var(--text)}
+.sec.open .acc h4{color:var(--text)}
+.accv{font-size:13px;font-weight:600;color:#c8c8c8;white-space:nowrap;transition:opacity .22s}
+.sec.open .accv{opacity:0}
+.acc svg{flex:none;color:var(--dim);transition:transform .32s cubic-bezier(.2,.75,.2,1)}
+.sec.open .acc svg{transform:rotate(180deg);color:var(--text)}
+.accb{height:0;overflow:hidden;visibility:hidden;transition:height .32s cubic-bezier(.2,.75,.2,1),visibility 0s .32s}
+.sec.open .accb{visibility:visible;transition:height .32s cubic-bezier(.2,.75,.2,1),visibility 0s}
+.acci{padding:2px 0 14px;opacity:0;transform:translateY(-6px);transition:opacity .18s,transform .32s cubic-bezier(.2,.75,.2,1)}
+.sec.open .acci{opacity:1;transform:none;transition:opacity .26s .07s,transform .32s cubic-bezier(.2,.75,.2,1)}
+@media (prefers-reduced-motion:reduce){.accb,.acci,.acc svg,.accv{transition:none!important}}
+.ctl+.ctl{margin-top:10px}
+.ctl h3{font-size:15px;font-weight:600;margin-bottom:6px}
+.note{font-size:12px;color:var(--dim);margin-top:7px}
+.segs{display:flex;gap:3px;padding:3px;border-radius:10px;background:var(--chip)}
+.seg{flex:1;padding:8px 0;border-radius:8px;font-size:13px;font-weight:600;text-align:center;color:#b0b0b0;white-space:nowrap}
+.seg.on{background:var(--text);color:#000}
+.seg:focus{box-shadow:0 0 0 2px var(--text)}
+.row{display:flex;align-items:center;gap:12px;width:100%;border-radius:10px;padding:5px 8px;margin:0 -8px;width:calc(100% + 16px)}
+.row+.row{margin-top:4px}
+.row div{flex:1;min-width:0}
+.row h3{font-size:15px;font-weight:600}
+.row p{font-size:12px;color:var(--dim);margin-top:2px}
+.row:focus{box-shadow:0 0 0 2px var(--text)}
+.row.on .sw{background:var(--text)}
+.row.on .sw:after{transform:translateX(17px);background:#000}
+
+/* playing now: the clip itself, live */
+.now{position:relative;display:flex;align-items:flex-end;width:100%;height:170px;border-radius:12px;overflow:hidden;background:var(--card)}
+.now video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
+.k4cover{position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;background:#0a0a0c}
+.k4cover img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;transform-origin:60% 45%;animation:kb 26s ease-in-out infinite alternate}
+@keyframes kb{from{transform:scale(1.04) translate(0,0)}to{transform:scale(1.16) translate(-2.5%,-3%)}}
+@media (prefers-reduced-motion:reduce){.k4cover img{animation:none}}
+.k4art{position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;background:radial-gradient(120% 160% at 88% 18%,#2a2e38 0%,#15171d 46%,#0a0a0c 100%)}
+.k4big{position:absolute;right:34px;top:50%;transform:translateY(-60%);font-size:150px;font-weight:800;letter-spacing:-7px;line-height:1;color:rgba(255,255,255,.07)}
+.k4shine{position:absolute;top:0;bottom:0;left:-45%;width:45%;background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.07),rgba(255,255,255,0));animation:k4s 5s ease-in-out infinite}
+@keyframes k4s{0%{left:-45%}55%,100%{left:120%}}
+@media (prefers-reduced-motion:reduce){.k4shine{animation:none;display:none}}
+.res{display:inline-block;margin-left:8px;padding:1px 6px;border-radius:5px;font-size:10.5px;font-weight:700;letter-spacing:.5px;line-height:15px;vertical-align:2px;color:#cfcfcf;box-shadow:inset 0 0 0 1px rgba(255,255,255,.32)}
+.res.r4K{background:#fff;color:#000;box-shadow:none}
+.main.on .res{color:#333;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
+.main.on .res.r4K{background:#000;color:#fff;box-shadow:none}
+.snd{display:inline-flex;align-items:center;margin-left:6px;vertical-align:-2px;color:#cfcfcf}
+.snd.off{color:#6a6a6a}
+.main.on .snd{color:#333}
+.main.on .snd.off{color:#999}
+.shade{position:absolute;left:0;top:0;width:100%;height:100%;background:#000;opacity:.25;transition:opacity .25s,background-color .25s}
+/* banner preview of the Picture looks (same strengths as on the home screen) */
+.bvig,.bhaze{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;opacity:0;transition:opacity .25s}
+.bvig{box-shadow:inset 0 0 110px 24px #000}.bhaze{background:#fff}
+.now:after{content:"";position:absolute;left:0;right:0;bottom:0;height:75%;background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,0))}
+.cap{position:relative;z-index:1;padding:0 20px 14px;min-width:0;width:100%}
+.state{display:flex;align-items:center;gap:8px;font-size:13px;color:#cfcfcf;margin-bottom:2px}
+.state b{font-weight:700;color:var(--text);letter-spacing:.8px;text-transform:uppercase;font-size:11px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.dot.live{background:var(--text);animation:breathe 2.4s ease-in-out infinite}
+@keyframes breathe{50%{opacity:.3}}
+.title{font-size:25px;font-weight:700;letter-spacing:-.4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* lists: compact rows, like a details view */
+.list{display:flex;flex-direction:column;gap:5px}
+.list.two{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:6px}
+.lhead{display:flex;align-items:center;gap:14px;padding:0 120px 6px 54px;font-size:12px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--dim)}
+.lhead .nm{flex:1}
+.item{position:relative}
+.main{display:flex;align-items:center;gap:14px;width:100%;min-height:58px;padding:8px 14px 8px 18px;border-radius:10px;background:var(--card);transition:background .15s}
+.vid .main{padding-right:108px}
+.main:focus{box-shadow:0 0 0 3px var(--text)}
+.main.on{background:var(--text);color:#000}
+.gico{flex:none;width:46px;height:46px;border-radius:9px;object-fit:cover;background:var(--chip)}
+.info{flex:1;min-width:0}
+.name{font-size:16px;font-weight:600;letter-spacing:-.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{margin-top:3px;display:flex;gap:10px;font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub span{overflow:hidden;text-overflow:ellipsis}
+.main.on .sub,.main.on .col{color:#555}
+.col{flex:none;width:84px;font-size:13px;color:var(--dim);text-align:right;white-space:nowrap}
+.tag{flex:none;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--chip);color:#d0d0d0;white-space:nowrap}
+.plnew{display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:12px;background:var(--card);font-size:15px;font-weight:700;margin:12px 0 16px}
+.plnew i{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--text);color:#000;font-style:normal;font-size:18px;font-weight:800}
+.pls{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:10px}
+.plc{position:relative;display:flex;align-items:center;gap:14px;padding:10px 16px 10px 10px;border-radius:14px;background:var(--card);transition:background .15s,box-shadow .15s}
+.plc.on{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.55)}
+.plc .open{flex:1;min-width:0;overflow:hidden;display:flex;align-items:center;gap:14px;text-align:left;color:inherit}
+.plcov{position:relative;flex:none;width:112px;height:63px;border-radius:9px;overflow:hidden;background:linear-gradient(135deg,#2b2f3a,#141519)}
+.plcov img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.plcov span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:6px;text-align:center;font-size:13px;font-weight:800;line-height:1.15;color:rgba(255,255,255,.85);overflow:hidden}
+.plc .t{flex:1;min-width:0}
+.plc .t b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plc .t em{display:block;white-space:normal;font-style:normal;font-size:13px;color:var(--dim);margin-top:4px}
+.plc .t em.live{color:var(--text)}
+.plc .tog{flex:none;display:flex;align-items:center;padding:8px 2px}
+.plc.on .tog .sw{background:var(--text)}
+.plc.on .tog .sw:after{transform:translateX(17px);background:#000}
+.ple{display:flex;flex-direction:column;gap:18px}
+.ple .sec{padding:16px 18px;border-radius:14px;background:var(--card)}
+.ple .lab{font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
+.plname{width:100%;padding:12px 14px;border-radius:10px;background:#0b0b0b;color:var(--text);font-size:17px;font-weight:600;border:0;outline:0;box-shadow:inset 0 0 0 1px var(--line)}
+.plname:focus{box-shadow:inset 0 0 0 2px var(--text)}
+.plseg{display:flex;gap:6px;flex-wrap:wrap}
+.plseg button{flex:1;min-width:64px;text-align:center;padding:9px 10px;border-radius:10px;background:#0b0b0b;font-size:14px;font-weight:700;color:#cfcfcf;box-shadow:inset 0 0 0 1px var(--line)}
+.plseg button.on{background:var(--text);color:#000;box-shadow:none}
+.plsw{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;color:inherit}
+.plsw b{font-size:15px}.plsw small{display:block;font-size:12px;color:var(--dim);font-weight:400;margin-top:2px}
+.plsw.on .sw{background:var(--text)}.plsw.on .sw:after{transform:translateX(17px);background:#000}
+.plbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.plbar .sp{flex:1}
+.plbar .lnk{padding:6px 10px;border-radius:8px;font-size:13px;font-weight:700;color:var(--dim)}
+.plbar .lnk:focus,.plbar .lnk:hover{color:var(--text);background:rgba(255,255,255,.06)}
+.plgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.plt{position:relative;display:flex;flex-direction:column;gap:6px;text-align:left;padding:6px;border-radius:12px;background:#0b0b0b;color:inherit;box-shadow:inset 0 0 0 1px var(--line)}
+.plt.on{box-shadow:inset 0 0 0 2px var(--text)}
+.plt .plcov{width:100%;height:auto;aspect-ratio:16/9}
+.plt .ck{position:absolute;top:12px;right:12px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.55);box-shadow:inset 0 0 0 2px rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900}
+.plt.on .ck{background:var(--text);color:#000;box-shadow:none}
+.plt .nm{font-size:13px;font-weight:600;padding:0 4px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plt .res{position:absolute;top:12px;left:12px;margin:0}
+.plfoot{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.plfoot .sp{flex:1}
+.plfoot .pldel{color:#ff6b6b}
+.uwrap{position:relative;flex:none}
+.uchip{position:relative;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;padding:0;background:var(--card);box-shadow:inset 0 0 0 2px var(--line);overflow:hidden}
+.uchip .uav{width:100%;height:100%;font-size:17px}
+.uchip.off{opacity:.55}
+.uchip:focus,.uchip.open{box-shadow:0 0 0 2px var(--text)}
+.upop{position:absolute;right:0;top:52px;z-index:60;width:320px;padding:8px;border-radius:16px;background:#161616;box-shadow:0 18px 50px rgba(0,0,0,.65),inset 0 0 0 1px var(--line)}
+.upop .uh{padding:8px 10px 10px;font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--dim)}
+.urow{display:flex;align-items:center;gap:12px;width:100%;padding:9px 10px;border-radius:11px;text-align:left;color:inherit}
+.urow:focus,.urow:hover{background:rgba(255,255,255,.06)}
+.urow .uav{width:38px;height:38px;font-size:15px}
+.urow .un{flex:1;min-width:0}
+.urow .un b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.urow .un small{display:block;font-size:12px;color:var(--dim);margin-top:2px}
+.urow.on .sw{background:var(--text)}
+.urow.on .sw:after{transform:translateX(17px);background:#000}
+.uav{position:relative;flex:none;width:44px;height:44px;border-radius:50%;object-fit:cover;background:#2a2a2a;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:#fff;overflow:hidden}
+.uav img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.opt.user{gap:16px}
+.opt.user .unow{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:6px;font-size:10.5px;font-weight:700;background:var(--chip);color:#d0d0d0;vertical-align:2px}
+.main.on .tag{background:#000;color:#fff}
+.tag i{width:7px;height:7px;border-radius:50%;background:currentColor;animation:breathe 2.4s ease-in-out infinite}
+.del{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;gap:6px;height:34px;min-width:34px;padding:0 9px;border-radius:999px;color:var(--dim);background:rgba(255,255,255,.06);font-size:13px}
+.main.on+.del{color:#333;background:rgba(0,0,0,.08)}
+.del:focus{box-shadow:0 0 0 2px var(--text);color:var(--text)}
+.del.armed{background:var(--text);color:#000;font-weight:600}
+.del svg{flex:none}
+.main.k4{opacity:.45}
+.ghint.g4k{color:#ffb454}
+.row.dis,.opt.dis{opacity:.45}
+.main.k4:focus{opacity:.75}
+.fav{position:absolute;right:54px;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:999px;color:var(--dim);background:rgba(255,255,255,.06)}
+.fav.on{color:#ff4d6d}
+.main.on~.fav{color:#333;background:rgba(0,0,0,.08)}
+.main.on~.fav.on{color:#e0244a}
+.fav:focus{box-shadow:0 0 0 2px var(--text);color:var(--text)}
+.fav.on:focus{color:#ff4d6d}
+.pc{flex:none;display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%}
+.pc.ok{color:#3ddc84;background:rgba(61,220,132,.12)}
+.pc.bad{color:#ff5c5c;background:rgba(255,92,92,.14)}
+.main.on .pc.ok{color:#0a7a3e;background:rgba(10,122,62,.14)}
+.main.on .pc.bad{color:#c62828;background:rgba(198,40,40,.14)}
+.sub .why{color:#ff7b7b}
+.main.on .sub .why{color:#c62828}
+
+/* settings view */
+.opts{display:flex;flex-direction:column;gap:6px}
+.opt{display:flex;align-items:center;gap:20px;width:100%;padding:14px 18px;border-radius:12px;background:var(--card)}
+.opt:focus{background:var(--card2);box-shadow:0 0 0 2px var(--text)}
+.opt div{flex:1;min-width:0}
+.opt b{display:block;font-size:16px;font-weight:600}
+.opt div span{display:block;margin-top:3px;font-size:13px;color:var(--dim)}
+.opt.on .sw{background:var(--text)}
+.opt.on .sw:after{transform:translateX(17px);background:#000}
+.about{display:flex;align-items:center;gap:16px;padding:14px 18px;border-radius:12px;background:var(--card);font-size:14px;color:var(--dim)}
+.about img{width:46px;height:46px;border-radius:10px}
+.about b{display:block;color:var(--text);font-size:16px;margin-bottom:2px}
+.about.remote b{font-size:22px;letter-spacing:-.3px;margin-bottom:6px}
+.btns{display:flex;gap:10px;margin-top:12px}
+.reset{padding:10px 20px;border-radius:999px;border:1px solid #5a5a5a;font-size:14px}
+.reset:focus{box-shadow:0 0 0 2px var(--text)}
+.reset.armed{background:var(--text);color:#000;font-weight:600;border-color:var(--text)}
+
+.empty{max-width:60ch;background:var(--card);border-radius:12px;padding:20px 22px;font-size:15px;color:var(--dim)}
+.empty b{display:block;color:var(--text);font-size:17px;margin-bottom:6px}
+.empty code{color:var(--text);font-family:inherit;font-weight:600}
+
+.hints{position:fixed;right:36px;bottom:12px;display:flex;align-items:center;gap:22px;font-size:13px;color:#bdbdbd;background:rgba(0,0,0,.6);padding:7px 16px;border-radius:999px}
+.hints span{display:flex;align-items:center;gap:8px}
+.hints .pair{display:flex;gap:4px}
+.modal{position:fixed;left:0;top:0;right:0;bottom:0;z-index:50;background:rgba(0,0,0,.86);display:flex;align-items:center;justify-content:center}
+.sheet{width:92%;max-width:1100px;max-height:86vh;overflow:auto;background:#0b0b0b;border-radius:16px;padding:20px 22px 22px;box-shadow:0 0 0 1px var(--line)}
+.sheet h2{margin-top:0}
+.sheet .hint{color:var(--dim);font-size:14px;margin:-4px 0 14px}
+.sheet .list{margin-bottom:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.chip{padding:8px 16px;border-radius:999px;background:var(--card);color:#c8c8c8;font-size:15px;font-weight:600}
+.chip.on{background:var(--text);color:#000}
+.chip:focus,.pg:focus{box-shadow:0 0 0 2px #000,0 0 0 4px var(--text)}
+.sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.scard{display:flex;flex-direction:column;border-radius:12px;background:var(--card);overflow:hidden;text-align:left}
+.scard:focus{box-shadow:0 0 0 3px var(--text)}
+.scard .pic{position:relative;width:100%;padding-top:56.25%;background:#0c0c0c;overflow:hidden}
+.scard .pic .sres{position:absolute;top:8px;left:8px;z-index:2;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:800;letter-spacing:.5px;line-height:15px;color:#fff;background:rgba(0,0,0,.62);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+.scard .pic .sres.r4K{background:#fff;color:#000;box-shadow:none}
+.scard .pic img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;display:block}
+.scard .meta{padding:10px 12px 12px}
+.scard .nm{font-size:15px;font-weight:700;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.5em}
+.scard .sb{margin-top:4px;font-size:12px;color:var(--dim)}
+.scard .act{margin-top:10px;display:block;text-align:center;padding:7px 0;border-radius:999px;background:var(--chip);font-size:13px;font-weight:700}
+.scard .act.dl{background:var(--text);color:#000}
+.scard .act.use{background:#2a6df4;color:#fff}
+.scard .act.inuse{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line);color:var(--dim)}
+.scard .bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(0,0,0,.5)}
+.scard .bar i{display:block;height:100%;background:var(--text)}
+.sq{display:block;width:100%;max-width:460px;box-sizing:border-box;padding:11px 18px;border-radius:999px;border:0;background:var(--card);color:var(--text);font-size:16px;margin:0 0 12px;outline:none;-webkit-appearance:none}
+.sq:focus{box-shadow:0 0 0 2px #000,0 0 0 4px var(--text)}
+.pg{padding:0 10px}.pg.arr{font-size:20px}.pgdot{align-self:center;color:var(--dim);padding:0 2px}
+.chips.subs{margin-top:-4px;padding-top:12px;border-top:1px solid var(--line)}
+.chips.subs:empty{display:none}
+.subs .chip{font-size:13px;padding:6px 12px}
+.scard .pic.nopic{background:linear-gradient(135deg,#1d1d1d,#0c0c0c)}
+.scard .pic.nopic:after{content:'Preview unavailable';position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;color:var(--faint);font-size:13px;font-weight:600}
+.pages{display:flex;gap:6px;justify-content:center;margin:16px 0 4px}
+.pg{min-width:40px;height:40px;border-radius:999px;background:var(--card);font-size:15px;font-weight:700;text-align:center}
+.pg.on{background:var(--text);color:#000}
+.ghint{color:var(--dim);font-size:14px;margin:-4px 0 12px}
+.toast{position:fixed;left:50%;bottom:56px;transform:translateX(-50%);background:var(--text);color:#000;font-weight:600;padding:10px 22px;border-radius:999px;font-size:14px;display:none;z-index:60}
+@media (max-width:1300px){.brand .bn,.live .l2{display:none}.tab{padding:10px 18px 10px 15px;font-size:17px}}
+@media (max-width:1100px){.side{width:290px}.col.loc,.lhead .loc{display:none}}
+@media (max-width:900px){.cols{flex-direction:column}.side{width:100%;position:static;max-height:none}.tab span{display:none}.tab{padding:11px 14px}}
+@media (max-width:760px){body{padding:0 16px 84px}.tabs .k{display:none}.hints{display:none}}
+@media (prefers-reduced-motion:reduce){.dot.live,.tag i{animation:none}.sw,.sw:after,.shade{transition:none}}
+.segs.tints{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.segs.tints .seg{min-width:0;white-space:nowrap}
+/* Settings tab: categories as big icon tiles, the chosen one below (its own look, not the side panel's) */
+.stiles{display:flex;gap:12px;margin:4px 0 22px}
+.stile{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;height:112px;border-radius:18px;background:var(--card);color:#bdbdbd;text-align:center;transition:background .15s,color .15s,transform .15s}
+.stile b{font-size:15px;font-weight:600}
+.stile .sico{width:46px;height:46px;border-radius:14px;background:var(--chip);display:flex;align-items:center;justify-content:center;transition:background .15s}
+.sico svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.stile.on{background:var(--text);color:#000}
+.stile.on .sico{background:#000;color:#fff}
+.stile:focus{box-shadow:0 0 0 2px #000,0 0 0 4px var(--text);transform:translateY(-2px)}
+.spane{display:none}.spane.on{display:block}
+.sphead{display:flex;align-items:center;gap:16px;padding:0 4px 16px;margin-bottom:14px;border-bottom:1px solid var(--line)}.gmhead+.hint{margin-top:12px}
+.sphead .sico.big{flex:none;width:52px;height:52px;border-radius:16px;background:var(--card2);display:flex;align-items:center;justify-content:center}
+.sphead .sico.big svg{width:26px;height:26px}
+.sphead h3{font-size:20px;font-weight:600}
+.sphead p{margin-top:3px;font-size:13.5px;color:var(--dim)}
+.spane .btns{margin-top:16px}
+.plfoot.top{position:sticky;top:0;z-index:4;background:#000;padding:10px 0;margin:-10px 0 -6px;box-shadow:0 1px 0 var(--line)}
+.gmhead{position:sticky;top:-20px;z-index:3;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-20px -22px 0;padding:16px 22px 12px;background:inherit;border-bottom:1px solid var(--line)}.gmhead+.hint{margin-top:12px}
+.gmhead h2{flex:1;margin:0;min-width:0}.gmhead .btns{margin:0;display:flex;gap:8px}.sheet{background-clip:padding-box}
+/* Settings tab: no home panel (the tab has every setting); copies of the panel's controls */
+body.noside .side{display:none}
+.ctlopt{display:block}.ctlopt>div:first-child{margin-bottom:12px}
+.ctlopt .segs{max-width:720px}
+/* Settings -> Wallpaper: fold-out groups (like the home panel), one open at a time */
+.sgrps{border-radius:16px;background:var(--card);padding:4px 18px}
+.sgrp{border-top:1px solid var(--line)}.sgrp:first-child{border-top:0}
+.sghead{display:flex;align-items:center;gap:12px;width:100%;padding:18px 4px;border-radius:10px;font-size:13px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#d8d8d8}
+.sghead span{flex:1}
+.sghead small{font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--dim)}
+.sghead .chev{flex:none;color:var(--dim);transition:transform .2s}
+.sghead:focus{box-shadow:0 0 0 2px var(--text)}
+.sgbody{display:none;padding:0 0 18px}
+.sgrp.open .sgbody{display:block}.sgrp.open .chev{transform:rotate(180deg)}
+.sgrp .opt{background:var(--card2)}
+.plundo{display:flex;justify-content:flex-end;margin-top:12px}.plundo .lnk{padding:8px 12px;border-radius:10px;font-size:13px;font-weight:700;color:var(--dim)}.plundo .lnk:focus,.plundo .lnk:hover{color:var(--text);background:rgba(255,255,255,.06)}
+</style></head><body>
+<div class="top">
+ <div class="brand"><img src="/icon.png" alt=""><span class="bn">LiveShell Engine</span><small>v1.5.0</small></div>
+ <div class="tabs" id="tabs"><em class="k">L1</em><button class="tab on" data-t="all"><svg width="16" height="16" viewBox="0 0 16 16"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>All</span></button><button class="tab" data-t="playlists"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 3.5h8M2 7h8M2 10.5h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M11 9.2v4.3l3.2-2.15z" fill="currentColor"/></svg><span>Playlists</span></button><button class="tab" data-t="games"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M4.5 4.5h7a3.5 3.5 0 0 1 3.4 4.3l-.7 2.9a1.7 1.7 0 0 1-2.9.8L9.9 11H6.1l-1.4 1.5a1.7 1.7 0 0 1-2.9-.8l-.7-2.9A3.5 3.5 0 0 1 4.5 4.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 7v2.4M3.8 8.2h2.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="10.6" cy="7.6" r=".9" fill="currentColor"/><circle cx="12" cy="9" r=".9" fill="currentColor"/></svg><span>Library</span></button><button class="tab" data-t="USB"><svg width="16" height="16" viewBox="0 0 16 16"><rect x="4.5" y="6" width="7" height="8.5" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 6V1.5h4V6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7 3.5h0M9 3.5h0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>USB</span></button><button class="tab" data-t="settings"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 1.5l1.3 1.8 2.2-.3.5 2.2 2 1-.9 2 .9 2-2 1-.5 2.2-2.2-.3L8 14.5l-1.3-1.8-2.2.3-.5-2.2-2-1 .9-2-.9-2 2-1 .5-2.2 2.2.3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>Settings</span></button><em class="k">R1</em></div>
+ <span class="uwrap"><button class="uchip" id="uchip" onclick="uPop(event)" aria-label="Users" style="display:none"></button><div class="upop" id="upop" style="display:none"></div></span>
+ <div class="live"><div class="l1"><span class="dot" id="dot2"></span><span id="ptext">Wallpaper</span></div><div class="l2" id="addr2"></div></div>
+</div>
+
+<div class="cols"><div class="left">
+<div class="now" id="now"><div class="shade" id="shade"></div><div class="bvig" id="bvig"></div><div class="bhaze" id="bhaze"></div>
+ <div class="cap"><div class="state"><span class="dot" id="dot"></span><b>Playing now</b><span id="st">Connecting</span></div><div class="title" id="title">&nbsp;</div></div></div>
+
+<div id="videos">
+<h2>Your videos<span id="cnt"></span></h2>
+<div class="lhead"><span class="nm">Name</span><span class="col loc">Location</span><span class="col">Size</span></div>
+<div class="list" id="list"></div>
+<div class="pages" id="vpages"></div>
+<div class="empty" id="empty" style="display:none"><b>Add a video to get started</b>
+ Copy an <code>.mp4</code> (H.264 or HEVC, up to 1080p) into <code>/data/LiveShell/video</code> on the console, or into a <code>liveshell</code> folder on a USB drive. It shows up here within a few seconds.</div>
+</div>
+
+<div id="plv" style="display:none">
+<h2>Playlists<span id="plcnt"></span></h2>
+<p class="ghint">Your wallpaper changes by itself through the videos of the playlist that is on. One playlist plays at a time.</p>
+<div id="plbox"></div>
+</div>
+<div id="gamesv" style="display:none">
+<h2>Library<span id="gcnt"></span></h2>
+<p class="ghint">Your games and apps. Pick one to give it its own video: it plays while that tile is highlighted, instead of the main video.</p>
+<p class="ghint g4k" id="g4k" style="display:none">Your main wallpaper is <span class="mres">4K</span>, so videos per game are paused: it plays on every tile. To use them, pick a 1080p main wallpaper, or turn on <b>Videos per game only</b> (Home screen, on the right): then only games with their own video show one. Your picks are kept.</p>
+<div class="list two" id="glist"><div class="empty">Loading your library...</div></div>
+</div>
+
+<div id="settings" style="display:none">
+<h2>Settings</h2>
+<div class="stiles" id="stiles"><button class="stile" data-c="wall" onclick="setScat('wall')"><span class="sico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4M10 8.5v5l4.5-2.5z"/></svg></span><b>Wallpaper</b></button><button class="stile" data-c="games" onclick="setScat('games')"><span class="sico"><svg viewBox="0 0 24 24"><path d="M6 8h12a4 4 0 0 1 3.9 4.9l-1 4.3a2.4 2.4 0 0 1-4.3.9L15 16H9l-1.6 2.1a2.4 2.4 0 0 1-4.3-.9l-1-4.3A4 4 0 0 1 6 8zM7.5 11v3M6 12.5h3M16 12h.01M18 14h.01"/></svg></span><b>Games</b></button><button class="stile" data-c="users" onclick="setScat('users')"><span class="sico"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/></svg></span><b>Users</b></button><button class="stile" data-c="remote" onclick="setScat('remote')"><span class="sico"><svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg></span><b>Phone and PC</b></button><button class="stile" data-c="about" onclick="setScat('about')"><span class="sico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5h.01"/></svg></span><b>About</b></button></div>
+<section class="spane" data-c="wall">
+<div class="sphead"><span class="sico big"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4M10 8.5v5l4.5-2.5z"/></svg></span><div><h3>Wallpaper</h3><p>Turn it on or off, where it hides and which clip starts.</p></div></div>
+<div class="sgrps">
+<div class="sgrp" data-g="gen"><button class="sghead" onclick="sgFold('gen')"><span>General</span><small id="sgv-gen"></small><svg class="chev" width="14" height="14" viewBox="0 0 14 14"><path d="M3.5 5.25L7 8.75l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+<div class="sgbody"><div class="opts">
+ <button class="opt" id="o-power" onclick="power()"><div><b>Wallpaper</b><span>Turn the video on the home screen on or off.</span></div><span class="sw"></span></button>
+ <button class="opt" id="s-menuhide" onclick="opt('menuhide')"><div><b>Hide in Settings</b><span>Normal PS5 background in Settings and system apps.</span></div><span class="sw"></span></button>
+ <button class="opt" id="o-shuffle" onclick="opt('shuffle')"><div><b>Random video on start</b><span>Each time LiveShell starts, it picks a different clip.</span></div><span class="sw"></span></button>
+</div></div></div>
+<div class="sgrp" data-g="home"><button class="sghead" onclick="sgFold('home')"><span>Home screen</span><small id="sgv-home"></small><svg class="chev" width="14" height="14" viewBox="0 0 14 14"><path d="M3.5 5.25L7 8.75l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+<div class="sgbody"><div class="opts">
+ <button class="opt" data-mirror="o-storeonly" onclick="opt('storeonly')"><div><b>PS Store only</b><span>The video shows only on the PlayStation Store tile. Other tiles keep the normal PS5 look.</span></div><span class="sw"></span></button>
+ <button class="opt" data-mirror="o-storeclip" onclick="openPicker('NPXS40047')"><div><b>PS Store video</b><span data-text="storeclipname"></span></div><span class="tag">Change</span></button>
+ <button class="opt" data-mirror="o-parallax" onclick="opt('parallax')"><div><b>Parallax</b><span>The video shifts a little as you move between games.</span></div><span class="sw"></span></button>
+</div></div></div>
+<div class="sgrp" data-g="sound"><button class="sghead" onclick="sgFold('sound')"><span>Sound</span><small id="sgv-sound"></small><svg class="chev" width="14" height="14" viewBox="0 0 14 14"><path d="M3.5 5.25L7 8.75l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+<div class="sgbody"><div class="opts">
+ <div class="opt ctlopt"><div><b>Sound</b><span>For videos with sound. The PS5's own music goes quiet while one plays.</span></div><div class="segs" data-mirror-segs="#volctl"></div></div>
+</div></div></div>
+<div class="sgrp" data-g="picture"><button class="sghead" onclick="sgFold('picture')"><span>Picture</span><small id="sgv-picture"></small><svg class="chev" width="14" height="14" viewBox="0 0 14 14"><path d="M3.5 5.25L7 8.75l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+<div class="sgbody"><div class="opts">
+ <div class="opt ctlopt"><div><b>Dim</b></div><div class="segs" data-mirror-segs="#dimctl"></div></div>
+ <div class="opt ctlopt"><div><b>Vignette</b></div><div class="segs" data-mirror-segs=".side .segs.look[data-l='2']"></div></div>
+ <div class="opt ctlopt"><div><b>Haze</b></div><div class="segs" data-mirror-segs=".side .segs.look[data-l='3']"></div></div>
+ <div class="opt ctlopt"><div><b>Colour layer</b><span>Tints the picture. With Dim up, it becomes a darker colour grade.</span></div><div class="segs" data-mirror-segs="#tintctl"></div></div>
+</div></div></div>
+</div>
+</section>
+<section class="spane" data-c="games">
+<div class="sphead"><span class="sico big"><svg viewBox="0 0 24 24"><path d="M6 8h12a4 4 0 0 1 3.9 4.9l-1 4.3a2.4 2.4 0 0 1-4.3.9L15 16H9l-1.6 2.1a2.4 2.4 0 0 1-4.3-.9l-1-4.3A4 4 0 0 1 6 8zM7.5 11v3M6 12.5h3M16 12h.01M18 14h.01"/></svg></span><div><h3>Games</h3><p>Videos per game, and what happens when you start a game and come back.</p></div></div>
+<div class="opts">
+ <button class="opt" id="o-gamevideos" onclick="opt('gamevideos')"><div><b>Videos per game</b><span id="gvnote">Games and apps play the video you gave them in Library. Off: every tile uses the main video (your choices are kept).</span></div><span class="sw"></span></button>
+ <button class="opt" data-mirror="o-pergame" onclick="pgOnly()"><div><b>Videos per game only</b><span>Only games with their own video show one; every other tile keeps the PS5 background. No main video.</span></div><span class="sw"></span></button>
+ <button class="opt" id="s-gamehide" onclick="opt('gamehide')"><div><b>Hide while a game is open</b><span>The game's own art shows; the video comes back when you close it. 4K and 2K videos always hide while a game is open.</span></div><span class="sw"></span></button>
+ <button class="opt" id="o-lfx" onclick="lfxNext()"><div><b>Game launch effect</b><span>How the wallpaper leaves when a game starts. Default: the normal fade. Cinematic: a slow push-in, then the fade. Slow fade: the picture holds a moment, then fades slowly.</span></div><span class="tag" id="lfxval">Default</span></button>
+ <button class="opt" id="o-resume" onclick="opt('resume')"><div><b>Resume after a game</b><span>When you come back from a game, the video goes on where it was instead of starting over.</span></div><span class="sw"></span></button>
+ </div>
+</section>
+<section class="spane" data-c="users">
+<div class="sphead"><span class="sico big"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/></svg></span><div><h3>Users</h3><p>LiveShell plays only for the users turned on; the others see the normal PS5 background. Each user keeps their own wallpaper.</p></div></div>
+<div class="opts" id="userlist"></div>
+</section>
+<section class="spane" data-c="remote">
+<div class="sphead"><span class="sico big"><svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg></span><div><h3>Phone and PC</h3><p>Control LiveShell from a browser on the same Wi-Fi.</p></div></div>
+<div class="about remote"><div><b id="addr">Looking up the address</b>Open this address in a browser on your phone or PC (same Wi-Fi) to upload videos, play them, delete them and turn the wallpaper on or off.</div></div>
+</section>
+<section class="spane" data-c="about">
+<div class="sphead"><span class="sico big"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5h.01"/></svg></span><div><h3>About</h3><p>Version, reset and shut down.</p></div></div>
+<div class="about"><img src="/icon.png" alt=""><div><b>LiveShell Engine v1.5.0</b>By AZiZ. Animated wallpapers for the PS5 home screen.</div></div>
+<div class="btns"><button class="reset" id="reset">Reset settings</button><button class="reset" id="shutdown">Shut down LiveShell</button></div>
+</section>
+</div>
+</div>
+<aside class="side"><div class="look">
+ <div class="sec" data-acc="home"><button class="acc" onclick="acc(this)" aria-expanded="false"><h4>Home screen</h4><span class="accv" id="av-home"></span><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3.5 5.25L7 8.75l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="accb"><div class="acci">
+  <button class="row" id="o-pergame" onclick="pgOnly()"><div><h3>Videos per game only</h3><p>Only games with their own video show one; every other tile keeps the PS5 background. No main video.</p></div><span class="sw"></span></button>
+  <button class="row" id="o-storeonly" onclick="opt('storeonly')"><div><h3>PS Store only</h3><p>The video shows only on the PlayStation Store tile. Other tiles keep the normal PS5 look.</p></div><span class="sw"></span></button>
+  <button class="row" id="o-storeclip" onclick="openPicker('NPXS40047')" style="display:none"><div><h3>PS Store video</h3><p id="storeclipname">Main video</p></div><span class="tag">Change</span></button>
+  <button class="row" id="o-parallax" onclick="opt('parallax')"><div><h3>Parallax</h3><p>The video shifts a little as you move between games.</p></div><span class="sw"></span></button>
+  <button class="row" id="h-lfx" onclick="lfxNext()"><div><h3>Game launch effect</h3><p>How the wallpaper leaves when a game starts.</p></div><span class="tag" id="h-lfxval">Default</span></button>
+ </div></div></div>
+ <div class="sec" data-acc="sound"><button class="acc" onclick="acc(this)" aria-expanded="false"><h4>Sound</h4><span class="accv" id="av-sound"></span><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3.5 5.25L7 8.75l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="accb"><div class="acci">
+  <div class="ctl"><div class="segs" id="volctl"><button class="seg" data-v="0">Mute</button><button class="seg" data-v="25">25%</button><button class="seg" data-v="50">50%</button><button class="seg" data-v="75">75%</button><button class="seg" data-v="100">100%</button></div>
+  <p class="note">For videos with sound. The PS5's own music goes quiet while one plays.</p></div>
+ </div></div></div>
+ <div class="sec" data-acc="picture"><button class="acc" onclick="acc(this)" aria-expanded="false"><h4>Picture</h4><span class="accv" id="av-picture"></span><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3.5 5.25L7 8.75l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="accb"><div class="acci">
+  <div class="ctl"><h3>Dim</h3><div class="segs" id="dimctl"><button class="seg" data-v="0">Off</button><button class="seg" data-v="25">25</button><button class="seg" data-v="50">50</button><button class="seg" data-v="60">60</button><button class="seg" data-v="70">70</button><button class="seg" data-v="80">80</button></div></div>
+  <div class="ctl"><h3>Vignette</h3><div class="segs look" data-l="2" data-k="vignette"><button class="seg" data-v="0">Off</button><button class="seg" data-v="1">Light</button><button class="seg" data-v="2">Strong</button></div></div>
+  <div class="ctl"><h3>Haze</h3><div class="segs look" data-l="3" data-k="haze"><button class="seg" data-v="0">Off</button><button class="seg" data-v="1">Light</button><button class="seg" data-v="2">Strong</button></div></div>
+  <div class="ctl"><h3>Colour layer</h3><div class="segs tints" id="tintctl"></div></div>
+ </div></div></div>
+ <div class="sec" data-acc="quick"><button class="acc" onclick="acc(this)" aria-expanded="false"><h4>Quick settings</h4><span class="accv" id="av-quick"></span><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3.5 5.25L7 8.75l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="accb"><div class="acci">
+  <button class="row" id="o-menuhide" onclick="opt('menuhide')"><div><h3>Hide in Settings</h3><p>Normal PS5 background in Settings and system apps.</p></div><span class="sw"></span></button>
+  <button class="row" id="o-gamehide" onclick="opt('gamehide')"><div><h3>Hide while a game is open</h3><p>The game's own art shows; the video comes back when you close it. 4K and 2K videos always hide while a game is open.</p></div><span class="sw"></span></button>
+  <button class="row" id="q-resume" onclick="opt('resume')"><div><h3>Resume after a game</h3><p>The video goes on where it was instead of starting over.</p></div><span class="sw"></span></button>
+  <button class="row" id="q-shuffle" onclick="opt('shuffle')"><div><h3>Random video on start</h3><p>Each time LiveShell starts, it picks a different clip.</p></div><span class="sw"></span></button>
+ </div></div></div>
+</div></aside>
+</div>
+
+<div class="hints">
+ <span><svg width="14" height="14" viewBox="0 0 14 14"><path d="M2.5 2.5l9 9M11.5 2.5l-9 9" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>Set as wallpaper</span>
+ <span><span class="pair"><em class="k">L1</em><em class="k">R1</em></span>Filter</span></div>
+<div class="modal" id="gm" style="display:none"><div class="sheet">
+ <div class="gmhead"><h2 id="gmt">Background for this tile</h2><div class="btns"><button class="reset" id="gmmain">Reset</button><button class="reset" id="gmcancel">Cancel</button></div></div>
+ <p class="hint">Pick the video that plays while this tile is highlighted on the home screen.</p>
+ <div class="list two" id="gml"></div>
+</div></div>
+<div class="toast" id="toast"></div>
+<script>
+var S=null,busy=false,key='',nowKey='',tab='all',started=false;
+var TABS=['all','playlists','games','USB','settings']; // Internal is in All
+function $(i){return document.getElementById(i)}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function bare(n){return n.replace(/\.mp4$/i,'')}
+function nice(n){var t=bare(n).replace(/[-_.]+/g,' ').replace(/\b(\w+ com|com|wallpaper|4k|1080p|hd)\b/gi,' ').replace(/\s+/g,' ').trim()||bare(n);return t.replace(/\b\w/g,function(c){return c.toUpperCase()})}
+function mb(b){return b>=1e9?(b/1e9).toFixed(1)+' GB':Math.max(1,Math.round(b/1e6))+' MB'}
+function toast(t){var e=$('toast');e.textContent=t;e.style.display='block';clearTimeout(e.t);e.t=setTimeout(function(){e.style.display='none'},2600)}
+function get(u,cb){var x=new XMLHttpRequest();x.open('GET',u);x.onload=function(){var r;try{r=JSON.parse(x.responseText)}catch(e){r={ok:false}}cb(r)};x.onerror=function(){busy=false;$('st').textContent='LiveShell is not running'};x.send()}
+function plog(m){var x=new XMLHttpRequest();x.open('GET','/api/log?m='+encodeURIComponent(m));x.send()}
+// The main wallpaper's resolution for the texts: "4K" or "2K" (a big one; its badge).
+function mainRes(){var i=cur();return i>=0&&(S.videos[i].res=='2K'||S.videos[i].res=='4K')?S.videos[i].res:'4K'}
+function cur(){if(!S)return -1;for(var i=0;i<S.videos.length;i++)if(S.videos[i].path==S.current)return i;return -1}
+function shown(v){return tab=='all'||v.where.indexOf(tab)==0}
+
+// The banner is the only video on the page (the home screen already decodes one).
+function banner(i){
+ var box=$('now'),old=box.querySelector('video');if(old){old.removeAttribute('src');old.load();box.removeChild(old)}
+ var oa=box.querySelector('.k4art,.k4cover');if(oa)box.removeChild(oa);
+ if(i<0)return null;
+ // 4K: the browser cannot play it (error 4) and every try takes the video hardware from the home screen: a clean
+ // placeholder instead (gradient, a faded 4K, a slow shine).
+ // With a cover (Discover's, or a frame the phone / PC page grabbed): the picture, slowly drifting.
+ if(S&&S.videos[i]&&S.videos[i].k4){var vv=S.videos[i],a=document.createElement('div');
+  if(vv.thumb){a.className='k4cover';a.innerHTML='<img src="/thumb?i='+i+'&s='+vv.size+'" alt="" onerror="this.parentNode.className=\'k4art\';this.remove()">'}
+  else{a.className='k4art';a.innerHTML='<span class="k4big">'+(vv.res=='2K'?'2K':'4K')+'</span><i class="k4shine"></i>';coverOnce(i)}
+  box.insertBefore(a,box.firstChild);return null}
+ var v=document.createElement('video');v.muted=true;v.loop=true;v.autoplay=true;v.setAttribute('playsinline','');
+ v.src='/video?i='+i;box.insertBefore(v,box.firstChild);
+ var p=v.play&&v.play();if(p&&p.catch)p.catch(function(){});
+ return v;
+}
+var bannerBad='',coverTried={};
+function coverOnce(i){var v=S&&S.videos[i];if(!v||coverTried[v.path])return;coverTried[v.path]=1;get('/api/cover?i='+i,function(r){if(r.ok)poll()})}
+function showCurrent(){var i=cur(),v=banner(i);if(v){v.onerror=function(){bannerBad=S&&i>=0?S.videos[i].path:'';plog('banner video error '+(v.error&&v.error.code));v.parentNode&&v.parentNode.removeChild(v)}}}
+
+function stateText(){
+ var s=S.status||'';
+ if(busy)return'Switching';
+ if(!S.enabled)return'Wallpaper is off';
+ if(S.game&&S.gamepause)return'Paused while a game runs';
+ if(s.indexOf('playing')==0)return'On your home screen';
+ if(s.indexOf('failed')==0)return'This video could not play. Try a 1080p .mp4';
+ if(s.indexOf('start')==0||s.indexOf('stop')==0)return'Switching';
+ return S.videos.length?'Waiting for the home screen':'No video yet';
+}
+function accVals(){if(!S)return;var on=[S.mainvideo===false,S.storeonly,S.parallax].filter(Boolean).length,lk=S.looks||[],LV=['','Light','Strong'];
+ $('av-home').textContent=on?on+' on':'All off';
+ $('av-sound').textContent=S.volume===0?'Mute':(S.volume==null?100:S.volume)+'%';
+ $('av-picture').textContent=(S.dim?'Dim '+S.dim:'Dim off')+(lk[2]?' \u00b7 Vignette':'')+(lk[3]?' \u00b7 Haze':'')}
+// Accordion: opening one closes the others. Height: from 0 to the content's height (then auto, so a row that
+// appears inside still fits), and back from the current height to 0.
+function accSet(sec,on,instant){var body=sec.querySelector('.accb'),is=sec.className.indexOf(' open')>=0;if(on==is)return;
+ sec.querySelector('.acc').setAttribute('aria-expanded',on?'true':'false');
+ if(instant){sec.className=on?sec.className+' open':sec.className.replace(' open','');body.style.height=on?'auto':'0px';return}
+ if(on){sec.className+=' open';body.style.height=body.scrollHeight+'px'}
+ else{body.style.height=body.scrollHeight+'px';void body.offsetHeight;sec.className=sec.className.replace(' open','');body.style.height='0px'}
+ clearTimeout(body._t);body._t=setTimeout(function(){if(sec.className.indexOf(' open')>=0)body.style.height='auto'},380)}  // in case transitionend never comes
+function acc(b){var me=b.parentNode,all=document.querySelectorAll('.side .sec'),on=me.className.indexOf(' open')<0;
+ for(var k=0;k<all.length;k++)accSet(all[k],all[k]==me?on:false);
+ try{localStorage.setItem('ls_acc',on?me.getAttribute('data-acc'):'')}catch(e){}}
+(function(){var all=document.querySelectorAll('.side .sec'),last='home';try{var v=localStorage.getItem('ls_acc');if(v!=null)last=v}catch(e){}
+ for(var k=0;k<all.length;k++){all[k].querySelector('.accb').addEventListener('transitionend',function(e){if(e.propertyName=='height'&&this.parentNode.className.indexOf(' open')>=0)this.style.height='auto'});
+  accSet(all[k],all[k].getAttribute('data-acc')==last,true)}})();
+function render(){accVals();
+ var i=cur(),live=S.enabled&&S.status.indexOf('playing')==0;
+ $('dot').className='dot'+(live?' live':'');
+ $('st').textContent=stateText();
+ $('o-power').className='opt'+(S.enabled?' on':'');$('dot2').className='dot'+(live?' live':'');
+ $('ptext').textContent=S.enabled?'Wallpaper on':'Wallpaper off';
+ var lk=document.querySelectorAll('.segs.look');for(var a1=0;a1<lk.length;a1++){var lv=(S.looks||[])[+lk[a1].getAttribute('data-l')]||0,bs=lk[a1].querySelectorAll('.seg');for(var b1=0;b1<bs.length;b1++)bs[b1].className='seg'+(+bs[b1].getAttribute('data-v')==lv?' on':'')}
+ var sg=$('dimctl').querySelectorAll('.seg');for(var q=0;q<sg.length;q++)sg[q].className='seg'+(+sg[q].getAttribute('data-v')==S.dim?' on':'');
+ bannerLook();
+ var sv=$('volctl').querySelectorAll('.seg'),vol=S.volume==null?100:S.volume;for(var q=0;q<sv.length;q++)sv[q].className='seg'+(+sv[q].getAttribute('data-v')==vol?' on':'');
+ $('title').textContent=i>=0?nice(S.videos[i].name):(S.videos.length?'Pick a video below':'Nothing yet');
+ $('addr').textContent=S.ip?'http://'+S.ip+':'+S.port:'No network address';
+ $('addr2').innerHTML=S.ip?'Upload videos at <b>'+S.ip+':'+S.port+'</b>':'';
+ var setv=tab=='settings';
+ var gv=tab=='games',sv=false,pv=tab=='playlists';$('plv').style.display=pv?'block':'none';if(pv){if(!plLoaded)loadPl();else if(!plDraft)renderPl()}$('videos').style.display=setv||gv||sv||pv?'none':'block';$('settings').style.display=setv?'block':'none';$('gamesv').style.display=gv?'block':'none';if(gv&&!gamesLoaded)loadGames();
+ $('o-shuffle').className='opt'+(S.shuffle?' on':'');$('o-resume').className='opt'+(S.resume?' on':'');segRow('tintctl',TINTS,S.tint||0,'tintSet');$('s-menuhide').className='opt'+(S.menuhide?' on':'');$('s-gamehide').className='opt'+(S.gamehide?' on':'');$('lfxval').textContent=LFX[S.launchfx||0];$('h-lfxval').textContent=LFX[S.launchfx||0];$('q-resume').className='row'+(S.resume?' on':'');$('q-shuffle').className='row'+(S.shuffle?' on':'');var qn=document.querySelectorAll('[data-acc="quick"] .row.on').length;$('av-quick').textContent=qn?qn+' on':'All off';renderUsers();renderUchip();$('o-gamevideos').className='opt'+(S.gamevideos!==false?' on':'')+(S.main4k||S.mainvideo===false?' dis':'');$('o-pergame').className='row'+(S.mainvideo===false?' on':'');$('o-gamehide').className='row'+(S.gamehide?' on':'');
+ $('gvnote').textContent=S.main4k?'Paused: your main wallpaper is '+mainRes()+'. Pick a 1080p main wallpaper, or turn on Videos per game only (Home screen).':'Games and apps play the video you gave them in Library. Off: every tile uses the main video (your choices are kept).';
+ $('g4k').style.display=S.main4k?'block':'none';var mr=document.querySelectorAll('.mres');for(var m1=0;m1<mr.length;m1++)mr[m1].textContent=mainRes();$('o-menuhide').className='row'+(S.menuhide?' on':'');$('o-parallax').className='row'+(S.parallax?' on':'');$('o-storeonly').className='row'+(S.storeonly?' on':'');$('o-storeclip').style.display=S.storeonly?'':'none';var sc=gameMap()['NPXS40047'];$('storeclipname').textContent=sc?clipName(sc):'Main video';
+ var list=S.videos.filter(shown);
+ $('cnt').textContent=list.length?list.length:'';
+ $('empty').style.display=S.videos.length?'none':'block';
+ var nk=i>=0?S.videos[i].path+(S.videos[i].thumb?'#':''):'';
+ if(nk!=nowKey){nowKey=nk;showCurrent()}
+ var vl=[];S.videos.forEach(function(v,n){if(shown(v))vl.push(n)});var vpages=Math.max(1,Math.ceil(vl.length/VPER));if(vpage>=vpages)vpage=vpages-1;
+ var k=tab+'|'+vpage+'|'+S.current+'|'+S.videos.map(function(v){return v.path+(v.fav?'*':'')+v.why}).join('|');
+ if(k==key)return;
+ var f=document.activeElement&&document.activeElement.getAttribute('data-i');
+ key=k;
+ var h='';
+ S.videos.forEach(function(v,n){
+  if(!shown(v))return;
+  var at=vl.indexOf(n);if(at<vpage*VPER||at>=vpage*VPER+VPER)return; // 15 per page: light with many videos
+  var on=n==i,t=nice(v.name);
+  h+='<div class="item vid"><button class="main'+(on?' on':'')+'" data-i="'+n+'" onclick="pick('+n+')">'
+   +(v.why?'<span class="pc bad" title="Won&#39;t play"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>'
+     :'<span class="pc ok" title="Plays on the PS5"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 6.2l2.3 2.3 4.7-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>')
+   +'<div class="info"><div class="name">'+esc(t)+(v.res?'<span class="res r'+v.res+'">'+v.res+'</span>':'')+(v.snd?'<span class="snd" title="Has sound"><svg width=\'14\' height=\'14\' viewBox=\'0 0 16 16\'><path d=\'M2.5 6h2.2L8 3.3v9.4L4.7 10H2.5z\' fill=\'currentColor\'/><path d=\'M10.6 5.6a3.2 3.2 0 0 1 0 4.8M12.4 3.9a5.6 5.6 0 0 1 0 8.2\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'1.4\' stroke-linecap=\'round\'/></svg></span>':'')+'</div><div class="sub">'+(v.why?'<span class="why">Won&#39;t play: '+esc(v.why)+'</span>':'<span>'+esc(v.name)+'</span>')+'</div></div>'
+   +(on?'<span class="tag"><i></i>Playing</span>':'')
+   +'<span class="col loc">'+esc(v.where)+'</span><span class="col">'+mb(v.size)+'</span></button>'
+   +'<button class="fav'+(v.fav?' on':'')+'" onclick="fav('+n+')" title="'+(v.fav?'Remove from favorites':'Favorite: keep at the top')+'"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 13.6S2 10 2 5.9A3 3 0 0 1 8 4.4a3 3 0 0 1 6 1.5C14 10 8 13.6 8 13.6z" fill="'+(v.fav?'currentColor':'none')+'" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>'
+   +'<button class="del" id="del'+n+'" onclick="del('+n+')" title="Delete"><svg width="15" height="15" viewBox="0 0 16 16"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 8.5h5.6l.7-8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span></span></button></div>';
+ });
+ $('list').innerHTML=h;
+ var vp='';if(vpages>1)for(var q2=0;q2<vpages;q2++)vp+='<button class="pg'+(q2==vpage?' on':'')+'" onclick="vPage('+q2+')">'+(q2+1)+'</button>';$('vpages').innerHTML=vp;
+ // Keep focus on a card only if the user was on one; the first open starts at the top.
+ if(f!=null){var t=$('list').querySelector('[data-i="'+f+'"]')||$('list').querySelector('.main');if(t)t.focus()}
+ else if(!started){started=true;window.scrollTo(0,0);var ft=$('tabs').querySelector('.tab.on');if(ft)ft.focus()}
+}
+function keepBanner(){
+ if(!S||(cur()>=0&&S.videos[cur()].path==bannerBad))return; // this clip cannot play in the browser: do not retry
+ var v=$('now').querySelector('video');
+ if(!v){if(cur()>=0)showCurrent();return}
+ if(v.paused||v.ended){var p=v.play();if(p&&p.catch)p.catch(function(){})}
+}
+setInterval(keepBanner,3000);
+var vpage=0,VPER=15;
+function vPage(k){vpage=k;key='';render();var b=$('vpages').querySelector('.pg.on');if(b)b.focus();window.scrollTo(0,0)}
+function setTab(t){if(t!=tab)vpage=0;tab=t;document.body.className=t=='settings'?'noside':'';var b=$('tabs').querySelectorAll('.tab');for(var n=0;n<b.length;n++)b[n].className='tab'+(b[n].getAttribute('data-t')==t?' on':'');key='';if(S)render()}
+function poll(){if(busy)return;get('/api/state',function(s){if(s.videos){S=s;render()}})}
+function act(u,start,done){if(busy||!S)return;busy=true;toast(start);render();get(u,function(r){busy=false;toast(r.ok?done:(r.error||'That did not work. Check liveshell.log'));poll()})}
+function pick(n){var v=S.videos[n];if(v.path==S.current&&S.enabled)return;act('/api/select?i='+n,'Switching to '+bare(v.name),'Now playing '+bare(v.name))}
+// On/off: flip the switch at once, undo it if the console says no.
+function power(){
+ if(!S)return;
+ plog('power pressed: enabled='+S.enabled+' busy='+busy);
+ if(busy){toast('One moment, still switching');return}
+ var on=!S.enabled;S.enabled=on;busy=true;render();toast(on?'Turning the wallpaper on':'Turning the wallpaper off');
+ get(on?'/api/on':'/api/off',function(r){
+  busy=false;plog('power result: '+(r.ok?'ok':(r.error||'failed')));
+  if(!r.ok)S.enabled=!on;
+  toast(r.ok?(on?'Wallpaper on':'Wallpaper off'):(r.error||'That did not work. Check liveshell.log'));render();poll()});
+}
+// Videos per game only = the main video off ("mainvideo" false); it turns Videos per game on.
+// Users: LiveShell per console user (GitHub issue #9).
+// The user circle at the top: the signed-in user; a tap lists every user with a switch (as Settings -> Users).
+var uOpen=false;
+function uNow(){var us=S&&S.users||[];return us.filter(function(u){return u.now})[0]||us[0]}
+function renderUchip(){var b=$('uchip');if(!b||!S)return;var u=uNow();b.style.display=u?'':'none';if(!u)return;
+ var k=u.id+'|'+u.name+'|'+u.on;if(b.getAttribute('data-k')!=k){b.setAttribute('data-k',k);b.innerHTML=userAv(u);b.title=u.name}b.className='uchip'+(u.on?'':' off')+(uOpen?' open':'');
+ if(uOpen)renderUpop()}
+function renderUpop(){var p=$('upop'),us=S&&S.users||[];if(!p)return;
+ var k=JSON.stringify(us);if(p.getAttribute('data-k')==k)return;p.setAttribute('data-k',k);
+ p.innerHTML='<div class="uh">LiveShell for</div>'+us.map(function(u){return'<button class="urow'+(u.on?' on':'')+'" onclick="userOn('+u.id+')">'+userAv(u)
+  +'<span class="un"><b>'+esc(u.name)+'</b><small>'+(u.now?'Signed in \u00b7 ':'')+(u.on?'Own wallpaper':'Normal PS5 background')+'</small></span><span class="sw"></span></button>'}).join('')}
+function uPop(e){if(e)e.stopPropagation();uOpen=!uOpen;var p=$('upop');p.style.display=uOpen?'block':'none';p.removeAttribute('data-k');renderUchip();
+ if(uOpen){renderUpop();var f=p.querySelector('.urow');if(f&&f.focus)f.focus()}else{var b=$('uchip');if(b&&b.focus)b.focus()}}
+document.addEventListener('click',function(e){if(uOpen&&!e.target.closest('.uwrap'))uPop()});
+document.addEventListener('keydown',function(e){if(uOpen&&(e.key=='Escape'||e.keyCode==27)){e.preventDefault();uPop()}});
+function userOn(id){if(!S)return;var u=(S.users||[]).filter(function(x){return x.id==id})[0];if(!u)return;
+ if(u.on&&(S.users||[]).filter(function(x){return x.on}).length<2){toast('At least one user keeps LiveShell.');return}
+ u.on=!u.on;render();get('/api/user?id='+id+'&on='+(u.on?1:0),function(r){toast(u.on?'LiveShell is on for '+u.name:'Off for '+u.name+': the normal PS5 background');poll()})}
+function userAv(u){return'<span class="uav">'+esc((u.name||'?').charAt(0).toUpperCase())+'<img src="/useravatar?id='+u.id+'" alt="" onerror="this.remove()"></span>'}
+function renderUsers(){var b=$('userlist');if(!b||!S)return;var us=S.users||[];
+ b.innerHTML=us.length?us.map(function(u){return'<button class="opt user'+(u.on?' on':'')+'" onclick="userOn('+u.id+')">'+userAv(u)
+  +'<div><b>'+esc(u.name)+(u.now?'<span class="unow">Signed in</span>':'')+'</b><span>'+(u.on?'Plays LiveShell (its own wallpaper)':'Normal PS5 background')+'</span></div><span class="sw"></span></button>'}).join('')
+  :'<div class="empty">Users show up here once they sign in.</div>'}
+// ---- Playlists: named sets of videos the wallpaper changes through by itself (one plays at a time) ----
+var PL=[],plLoaded=false,plEdit=-1,plDraft=null,plRes='all',PLE=[1,5,15,30,60];
+function loadPl(){plLoaded=true;get('/api/playlists',function(r){PL=Array.isArray(r)?r:[];renderPl()})}
+function plText(){return PL.map(function(p){return'P\t'+p.name.replace(/[\t\r\n]/g,' ')+'\t'+(p.on?1:0)+'\t'+p.every+'\t'+(p.shuffle?1:0)+'\n'+p.videos.map(function(v){return'V\t'+v+'\n'}).join('')}).join('')}
+function plSave(msg){var x=new XMLHttpRequest();x.open('POST','/api/playlists');x.onload=function(){var r={};try{r=JSON.parse(x.responseText)}catch(e){}if(msg)toast(r.ok?msg:(r.error||'That did not work'));loadPl();poll()};x.onerror=function(){toast('LiveShell is not running')};x.send(plText())}
+function plIdx(path){var at=-1;(S&&S.videos||[]).forEach(function(v,n){if(at<0&&v.path==path)at=n});return at}
+function plCount(p){return p.videos.filter(function(v){return plIdx(v)>=0}).length}
+// A cover: the clip's own picture, else its Discover preview, else the name on a tile.
+var plBad={},plKey='';
+function plCov(n,label){var v=n>=0&&S.videos[n],src=v?(v.thumb?'/thumb?i='+n+'&s='+v.size:'/vidcover?i='+n+'&p='+encodeURIComponent(v.name)):'';
+ if(src&&plBad[src])src='';
+ return'<span class="plcov"><span>'+esc(label)+'</span>'+(src?'<img src="'+src+'" alt="" loading="lazy" onerror="plBad[this.getAttribute(\'src\')]=1;this.remove()">':'')+'</span>'}
+function plOn(i){var p=PL[i];if(!p)return;if(!p.on&&!plCount(p)){toast('Add a video to this playlist first');return}var on=!p.on;PL.forEach(function(q){q.on=false});p.on=on;renderPl();plSave(on?p.name+' is playing':p.name+' stopped')}
+function plNew(){plEdit=PL.length;plDraft={name:'My playlist'+(PL.length?' '+(PL.length+1):''),on:true,every:5,shuffle:false,videos:[],fresh:true};plRes='all';renderPl()}
+function plOpen(i){plEdit=i;plDraft=JSON.parse(JSON.stringify(PL[i]));plRes='all';renderPl()}
+function plCancel(){plEdit=-1;plDraft=null;renderPl()}
+function plUndo(){if(!confirm('Go back to the playlists before your last change?'))return;get('/api/playlists/restore',function(r){toast(r.ok?'Playlists restored':(r.error||'That did not work'));plLoaded=false;loadPl();poll()})}
+function plDelete(){if(plEdit<0||plEdit>=PL.length||!confirm('Delete the playlist "'+PL[plEdit].name+'"?'))return;PL.splice(plEdit,1);plEdit=-1;plDraft=null;renderPl();plSave('Playlist deleted')}
+function plKeep(){plName();var d=plDraft;d.name=(d.name||'').replace(/^\s+|\s+$/g,'').slice(0,40)||'My playlist';
+ if(!d.videos.length){toast('Pick at least one video');return}
+ if(d.fresh){PL.forEach(function(q){q.on=false});d.on=true}delete d.fresh;  // a new playlist plays right away
+ if(d.on)PL.forEach(function(q,k){if(k!=plEdit)q.on=false});
+ PL[plEdit]=d;plEdit=-1;plDraft=null;renderPl();plSave(d.on?d.name+' is playing: the wallpaper changes every '+d.every+' min':'Saved '+d.name)}
+function plName(){var n=$('plname');if(n&&plDraft)plDraft.name=n.value}
+function plEvery(m){plName();plDraft.every=m;renderPl()}
+function plShuf(){plName();plDraft.shuffle=!plDraft.shuffle;renderPl()}
+function plFilter(r){plName();plRes=r;renderPl()}
+function plResOf(v){return v.res=='4K'||v.res=='2K'?'4K':'1080p'}  // the few 2K ones count as 4K
+function plPool(){return(S&&S.videos||[]).filter(function(v){return!v.why&&(plRes=='all'||plResOf(v)==plRes)})}
+function plAll(){plName();var has={};plDraft.videos.forEach(function(v){has[v]=1});plPool().forEach(function(v){if(!has[v.path])plDraft.videos.push(v.path)});renderPl()}
+function plClear(){plName();var p={};plPool().forEach(function(v){p[v.path]=1});plDraft.videos=plDraft.videos.filter(function(v){return!p[v]});renderPl()}
+function plPick(n){plName();var v=S.videos[n],at=plDraft.videos.indexOf(v.path);if(at>=0)plDraft.videos.splice(at,1);else plDraft.videos.push(v.path);
+ var b=document.querySelector('[data-pv="'+n+'"]');if(b){b.className='plt'+(at>=0?'':' on');b.querySelector('.ck').textContent=at>=0?'':'\u2713'}var c=$('plsel');if(c)c.textContent=plDraft.videos.length+' selected'}
+function renderPl(){var box=$('plbox');if(!box||!S)return;$('plcnt').textContent=PL.length||'';
+ // only when something shown changed: a rebuild reloads every cover (they flickered on each state poll)
+ var k=JSON.stringify([PL,plDraft,plRes,plEdit,S&&S.plbak])+S.videos.map(function(v){return v.path+(v.thumb?1:0)+(v.why?1:0)}).join('|');if(k==plKey)return;plKey=k;
+ if(plDraft){var d=plDraft,idx={};d.videos.forEach(function(v){idx[v]=1});
+  var vids=S.videos.map(function(v,n){return[v,n]}).filter(function(x){return!x[0].why&&(plRes=='all'||plResOf(x[0])==plRes)});
+  box.innerHTML='<div class="ple">'
+   +'<div class="plfoot top"><button class="reset armed" onclick="plKeep()">'+(d.fresh?'Create and play':'Save')+'</button><button class="reset" onclick="plCancel()">Cancel</button><span class="sp"></span>'
+   +(d.fresh?'':'<button class="reset pldel" onclick="plDelete()">Delete playlist</button>')+'</div>'
+   +'<div class="sec"><div class="lab">Name</div><input id="plname" class="plname" maxlength="40" value="'+esc(d.name)+'" oninput="plName()"></div>'
+   +'<div class="sec"><div class="lab">Change every</div><div class="plseg">'+PLE.map(function(m){return'<button class="'+(d.every==m?'on':'')+'" onclick="plEvery('+m+')">'+m+' min</button>'}).join('')+'</div>'
+   +'<div style="height:14px"></div><button class="plsw'+(d.shuffle?' on':'')+'" onclick="plShuf()"><span><b>Shuffle</b><small>Play the videos in a random order</small></span><span class="sw"></span></button></div>'
+   +'<div class="sec"><div class="plbar"><span class="lab" style="margin:0">Videos</span><span class="note" id="plsel" style="margin:0 6px">'+d.videos.length+' selected</span><span class="sp"></span>'
+   +[['all','All'],['4K','4K'],['1080p','1080p']].map(function(r){return'<button class="chip'+(plRes==r[0]?' on':'')+'" onclick="plFilter(\''+r[0]+'\')">'+r[1]+'</button>'}).join('')
+   +'<button class="lnk" onclick="plAll()">Select all</button><button class="lnk" onclick="plClear()">Clear</button></div>'
+   +'<div class="plgrid">'+(vids.length?vids.map(function(x){var v=x[0],on=!!idx[v.path],t=nice(v.name);return'<button class="plt'+(on?' on':'')+'" data-pv="'+x[1]+'" onclick="plPick('+x[1]+')">'+plCov(x[1],t)
+    +(v.res?'<span class="res r'+v.res+'">'+v.res+'</span>':'')+'<span class="ck">'+(on?'\u2713':'')+'</span><span class="nm">'+esc(t)+'</span></button>'}).join(''):'<div class="empty">No videos here.</div>')+'</div></div>'
+   +'</div>';
+  return}
+ box.innerHTML='<button class="plnew" onclick="plNew()"><i>+</i>New playlist</button>'
+  +(PL.length?'<div class="pls">'+PL.map(function(p,i){var n=plCount(p),first=-1;p.videos.forEach(function(v){if(first<0)first=plIdx(v)});
+   return'<div class="plc'+(p.on?' on':'')+'"><button class="open" onclick="plOpen('+i+')">'+plCov(first,p.name)+'<span class="t"><b>'+esc(p.name)+'</b><em class="'+(p.on?'live':'')+'">'
+    +(p.on?'Playing \u00b7 ':'')+n+' video'+(n==1?'':'s')+' \u00b7 every '+p.every+' min'+(p.shuffle?' \u00b7 shuffle':'')+'</em></span></button>'
+    +'<button class="tog" onclick="plOn('+i+')" aria-label="On / off"><span class="sw"></span></button></div>'}).join('')+'</div>'
+   :'<div class="empty"><b>No playlists yet</b>Make one, pick your videos, and your wallpaper changes by itself.</div>')+(S&&S.plbak?'<div class="plundo"><button class="lnk" onclick="plUndo()">\u21b6 Undo last change</button></div>':'')}
+// Game launch effect: Fade / Dive / Pull back.
+var LFX=['Default','Cinematic','Slow fade'];  // Default = the normal fade
+function lfxSet(m){if(!S)return;S.launchfx=m;render();get('/api/launchfx?m='+m,function(){toast('Game launch effect: '+LFX[m]);poll()})}
+function lfxNext(){if(S)lfxSet(((S.launchfx||0)+1)%LFX.length)}
+// Picture -> Colour layer (a tint of the dim layer).
+var TINTS=['Default','Warm','Cool','Rose','Teal','Violet'];
+function tintSet(v){if(!S)return;S.tint=v;render();get('/api/tint?v='+v,function(){poll()})}
+function segRow(id,vals,cur,fn){var b=$(id);if(!b)return;var h=vals.map(function(n,i){return'<button class="seg'+(cur==i?' on':'')+'" onclick="'+fn+'('+i+')">'+n+'</button>'}).join('');if(b.innerHTML!=h)b.innerHTML=h}
+function pgOnly(){if(!S)return;var on=S.mainvideo!==false;S.mainvideo=!on;if(on)S.gamevideos=true;render();
+ get('/api/set?k=mainvideo&v='+(on?0:1),function(r){toast(r.ok?(on?'Videos per game only: other tiles keep the PS5 background':'The main video is back on every tile'):(r.error||'That did not work'));poll()})}
+function opt(k){if(!S)return;if(k=='gamevideos'&&S.main4k){toast('Videos per game are paused while your main wallpaper is '+mainRes()+'.');return}if(k=='gamevideos'&&S.mainvideo===false){toast('Videos per game only needs them on. Turn that off first.');return}var on=!S[k];S[k]=on;render();
+ get('/api/set?k='+k+'&v='+(on?1:0),function(r){toast(r.ok?'Saved':(r.error||'That did not work'));poll()})}
+// Delete and reset ask twice: the first press arms the button for 3 s.
+function arm(b,label){if(b.className.indexOf('armed')>=0)return true;b.className+=' armed';var s=b.querySelector('span')||b;var old=s.textContent;s.textContent=label;setTimeout(function(){b.className=b.className.replace(' armed','');s.textContent=old},3000);return false}
+// Favorite: pinned at the top of the list until un-favorited (the console keeps the list).
+function fav(n){var v=S.videos[n];if(!v||busy)return;var on=!v.fav;busy=true;
+ get('/api/fav?i='+n+'&v='+(on?1:0),function(r){busy=false;key='';toast(r.ok?(on?'Favorite: '+bare(v.name)+' stays at the top':'Removed from favorites'):(r.error||'That did not work'));poll()})}
+function del(n){var b=$('del'+n),v=S.videos[n];if(!b||!v||!arm(b,'Delete?'))return;busy=true;toast('Deleting '+bare(v.name));
+ get('/api/delete?i='+n,function(r){busy=false;key='';toast(r.ok?'Deleted '+bare(v.name):(r.error||'That did not work'));poll()})}
+$('shutdown').onclick=function(){if(!arm(this,'Press again to shut down'))return;get('/api/shutdown',function(){toast('LiveShell is shutting down. The home screen restarts in a moment.')})};
+$('reset').onclick=function(){if(!arm(this,'Press again to reset'))return;get('/api/reset',function(r){toast(r.ok?'Settings reset':(r.error||'That did not work'));poll()})};
+function step(d){var n=(TABS.indexOf(tab)+d+TABS.length)%TABS.length;setTab(TABS[n])}
+$('tabs').onclick=function(e){var b=e.target;while(b&&b!==this&&!b.getAttribute('data-t'))b=b.parentNode;var t=b&&b.getAttribute&&b.getAttribute('data-t');if(t)setTab(t)};
+var lkb=document.querySelectorAll('.segs.look');for(var c1=0;c1<lkb.length;c1++)lkb[c1].onclick=function(e){var v=e.target.getAttribute&&e.target.getAttribute('data-v');if(v==null||!S)return;var l=+this.getAttribute('data-l'),k=this.getAttribute('data-k'),t=this.parentNode.querySelector('h3').textContent;if(!S.looks)S.looks=[0,0,0,0];S.looks[l]=+v;render();get('/api/look?k='+k+'&v='+v,function(r){toast(r.ok?t+': '+['off','light','strong'][+v]:'That did not work. Check liveshell.log')})};
+$('volctl').onclick=function(e){var v=e.target.getAttribute&&e.target.getAttribute('data-v');if(v==null||!S)return;S.volume=+v;render();get('/api/volume?v='+v,function(r){toast(r.ok?(v=='0'?'Muted':'Sound '+v+'%'):'That did not work. Check liveshell.log')})};
+$('dimctl').onclick=function(e){var v=e.target.getAttribute&&e.target.getAttribute('data-v');if(v==null||!S)return;S.dim=+v;render();get('/api/dim?v='+v,function(r){toast(r.ok?(v=='0'?'Dim off':'Wallpaper dimmed '+v+'%'):'That did not work. Check liveshell.log')})};
+// Controller: the PS5 browser turns buttons into key events; which codes L1/R1/triangle send is
+// logged (first 40 keys) so they can be mapped. PageUp/PageDown are the usual guesses for L1/R1.
+var keyLogs=0;
+document.addEventListener('keydown',function(e){
+ if(e.keyCode==33||e.key=='PageUp'||e.keyCode==116){step(-1);e.preventDefault()}
+ else if(e.keyCode==34||e.key=='PageDown'||e.keyCode==117){step(1);e.preventDefault()}
+});
+var pad={};
+function readPad(){var g=navigator.getGamepads?navigator.getGamepads():[];for(var n=0;n<g.length;n++){var p=g[n];if(!p)continue;
+ [[4,function(){step(-1)}],[5,function(){step(1)}]].forEach(function(m){var d=p.buttons[m[0]]&&p.buttons[m[0]].pressed;if(d&&!pad[m[0]])m[1]();pad[m[0]]=d})}}
+if(navigator.getGamepads)setInterval(readPad,80);
+var GAME=(location.search.match(/[?&]game=([A-Za-z0-9]+)/)||[])[1]||'';
+// Library tab: every installed game and app; tap one to give it its own video.
+var GAMES=[],gamesLoaded=false;
+function loadGames(){gamesLoaded=true;var x=new XMLHttpRequest();x.open('GET','/api/games');x.onload=function(){try{GAMES=JSON.parse(x.responseText)}catch(e){GAMES=[]}renderGames()};x.send()}
+function gameName(tid){if(tid=='NPXS40047')return'PlayStation Store';for(var k=0;k<GAMES.length;k++)if(GAMES[k].tid==tid)return GAMES[k].name;return tid}
+function clipName(path){var b=path.split('/').pop();return nice(b)}
+function renderGames(){
+ var own=0,ord=[];GAMES.forEach(function(g,n){if(g.clip){own++;ord.push(n)}});GAMES.forEach(function(g,n){if(!g.clip)ord.push(n)});
+ $('gcnt').textContent=GAMES.length?GAMES.length+(own?' \u00b7 '+own+' with their own video':''):'';var h='';
+ ord.forEach(function(n){var g=GAMES[n],has=!!g.clip;
+  h+='<div class="item"><button class="main'+(has?' on':'')+'" onclick="openPicker(GAMES['+n+'].tid)"><img class="gico" src="/gameicon?tid='+g.tid+'" alt="" onerror="this.style.visibility=\'hidden\'">'
+   +'<div class="info"><div class="name">'+esc(g.name)+'</div><div class="sub"><span>'+esc(g.tid)+'</span><span>'+(has?esc(clipName(g.clip)):'Main wallpaper')+'</span></div></div>'
+   +(has?'<span class="tag"><i></i>Own video</span>':'')+'</button></div>'});
+ $('glist').innerHTML=h||'<div class="empty">Nothing found.</div>';
+}
+// "★ Change background" in a game's menu opens this window with a pending game: show the picker.
+var gameShown='',gameNow='';
+function gameMap(){var m={};((S&&S.games)||'').split('\n').forEach(function(l){var k=l.indexOf('=');if(k>0)m[l.slice(0,k)]=l.slice(k+1)});return m}
+function openPicker(tid){
+ gameNow=tid;var cur=gameMap()[tid]||'',h='';
+ $('gmt').textContent='Background for '+gameName(tid);
+ S.videos.forEach(function(v,n){var on=v.path==cur,t=nice(v.name);
+  h+='<div class="item"><button class="main'+(on?' on':'')+(v.k4&&gameNow!='NPXS40047'?' k4':'')+'" onclick="pickGame('+n+')">'
+   +'<div class="info"><div class="name">'+esc(t)+'</div><div class="sub">'+(v.k4&&gameNow!='NPXS40047'?'<span>'+(v.res||'4K')+': main wallpaper only</span>':'<span>'+esc(v.where)+'</span><span>'+mb(v.size)+'</span>')+'</div></div>'
+   +(on?'<span class="tag"><i></i>Chosen</span>':v.k4&&gameNow!='NPXS40047'?'<span class="tag">'+(v.res||'4K')+'</span>':'')+'</button></div>'});
+ $('gml').innerHTML=h||'<div class="empty">No videos yet.</div>';
+ $('gm').style.display='flex';var f=$('gml').querySelector('.main.on')||$('gml').querySelector('.main');if(f)f.focus();
+ plog('picker opened for game '+tid);
+}
+function closePicker(){$('gm').style.display='none';gameNow=''}
+function pickGame(n){var tid=gameNow,v=S.videos[n];if(v&&v.k4&&tid!='NPXS40047'){toast((v.res||'4K')+' videos work as the main wallpaper only. Pick a 1080p video for this game.');return}get('/api/gamebg?tid='+tid+'&i='+n,function(r){toast(r.ok?nice(v.name)+' set for '+gameName(tid):(r.error||'That did not work'));closePicker();poll();loadGames()})}
+$('gmmain').onclick=function(){var tid=gameNow;get('/api/gamebg?tid='+tid+'&i=-1',function(r){toast(r.ok?gameName(tid)+' uses the main wallpaper':'That did not work');closePicker();poll();loadGames()})};
+$('gmcancel').onclick=function(){closePicker()};
+function checkGameReq(){if(!S)return;if(!gamesLoaded)loadGames();var g=GAME;if(g&&g!=gameShown){gameShown=g;GAME='';openPicker(g)}}
+setInterval(checkGameReq,700);
+poll();setInterval(poll,3000);
+// Settings tab categories (remembered on this console's browser).
+var SCAT='wall';try{SCAT=localStorage.getItem('ls-scat')||'wall'}catch(e){}
+function setScat(c,focus){if(!document.querySelector('.spane[data-c="'+c+'"]'))c='wall';SCAT=c;try{localStorage.setItem('ls-scat',c)}catch(e){}
+ var b=document.querySelectorAll('.stile'),p=document.querySelectorAll('.spane'),i;for(i=0;i<b.length;i++)b[i].className='stile'+(b[i].getAttribute('data-c')==c?' on':'');
+ for(i=0;i<p.length;i++)p[i].className='spane'+(p[i].getAttribute('data-c')==c?' on':'')}
+setScat(SCAT);
+// The banner previews the Picture settings: Dim, Colour layer (as ShellUI paints it), Vignette, Haze.
+function bannerLook(){var K=[[0,0,0],[1,.55,.2],[.25,.5,1],[1,.35,.6],[.1,.85,.75],[.55,.35,1]],t=S.tint||0,a=(S.dim||0)/100,lk=S.looks||[];
+ if(t>0&&a<.22)a=.22;var d=a<.22?0:(a-.22)/.78,c=K[t]||K[0],f=function(v){return Math.round(255*v*(1-.85*d))};
+ var sh=$('shade');sh.style.backgroundColor=t>0?'rgb('+f(c[0])+','+f(c[1])+','+f(c[2])+')':'#000';sh.style.opacity=a;
+ $('bvig').style.opacity=lk[2]?(lk[2]>=2?.85:.55):0;$('bhaze').style.opacity=lk[3]?(lk[3]>=2?.35:.18):0}
+// The Settings tab's copies of the home panel's controls: same state, a press goes to the original.
+function mirror(){var i,m=document.querySelectorAll('[data-mirror]');
+ for(i=0;i<m.length;i++){var el=m[i],src=$(el.getAttribute('data-mirror'));if(!src)continue;el.style.display=src.style.display;
+  var c='opt'+(/\bon\b/.test(src.className)?' on':'')+(/\bdis\b/.test(src.className)?' dis':'');if(el.className!=c)el.className=c;
+  var tx=el.querySelector('[data-text]');if(tx){var o=$(tx.getAttribute('data-text'));if(o&&tx.textContent!=o.textContent)tx.textContent=o.textContent}}
+ var g=document.querySelectorAll('[data-mirror-segs]');
+ for(i=0;i<g.length;i++){var sel=g[i].getAttribute('data-mirror-segs'),sr=document.querySelector(sel);if(!sr)continue;
+  var h=sr.innerHTML.replace(/ onclick="[^"]*"/g,'');if(g[i].innerHTML!=h)g[i].innerHTML=h;
+  var a=sr.querySelectorAll('.seg'),b=g[i].querySelectorAll('.seg');for(var j=0;j<b.length&&j<a.length;j++)if(b[j].className!=a[j].className)b[j].className=a[j].className}}
+document.addEventListener('click',function(e){var t=e.target;while(t&&t!=document&&!(t.className&&/\bseg\b/.test(t.className)))t=t.parentNode;if(!t||t==document)return;
+ var box=t.parentNode;if(!box||!box.getAttribute||!box.getAttribute('data-mirror-segs'))return;var sr=document.querySelector(box.getAttribute('data-mirror-segs'));if(!sr)return;
+ var all=box.querySelectorAll('.seg'),k=-1;for(var j=0;j<all.length;j++)if(all[j]==t)k=j;var to=sr.querySelectorAll('.seg')[k];if(to)to.click();setTimeout(mirror,0)});
+var renderBase=render;render=function(){renderBase.apply(this,arguments);mirror()};
+// Settings -> Wallpaper groups: one open at a time; the headers sum up what is inside.
+var SGRP='gen';try{SGRP=localStorage.getItem('ls-sgrp')||'gen'}catch(e){}
+function sgFold(k){SGRP=SGRP==k?'':k;try{localStorage.setItem('ls-sgrp',SGRP)}catch(e){}sgShow()}
+function sgShow(){var g=document.querySelectorAll('.sgrp');for(var i=0;i<g.length;i++)g[i].className='sgrp'+(g[i].getAttribute('data-g')==SGRP?' open':'')}
+function sgVals(){if(!S)return;var t=function(id,v){var e=$(id);if(e&&e.textContent!=v)e.textContent=v};
+ t('sgv-gen',S.enabled?'Wallpaper on':'Wallpaper off');
+ var h=$('av-home'),so=$('av-sound'),pi=$('av-picture');t('sgv-home',h?h.textContent:'');t('sgv-sound',so?so.textContent:'');t('sgv-picture',pi?pi.textContent:'')}
+sgShow();
+var renderSg=render;render=function(){renderSg.apply(this,arguments);sgVals()};
+</script></body></html>

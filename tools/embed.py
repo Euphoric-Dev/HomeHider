@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Embed an HTML page into a C header: embed.py page.html out.h SYMBOL"""
+"""Embed a file (HTML page, ELF) into a C header: embed.py in out.h SYMBOL"""
 import sys
 
 src, dst = sys.argv[1], sys.argv[2]
