@@ -38,6 +38,10 @@ int  folders_save(hh_t *h, const char *tid, const char *name, const char *tab,
                   const char *color, const char *items_csv, char *out_tid,
                   char *note, size_t notesz);
 int  folders_delete(hh_t *h, const char *tid);
+/* Moves a folder's tile to the Games or Media tab. */
+int  folders_set_tab(hh_t *h, const char *tid, const char *tab);
+/* Takes one app out of its folder, leaving it on its tab. */
+int  folders_remove_member(hh_t *h, const char *tid);
 /* img == NULL goes back to the automatic collage. */
 int  folders_set_icon(hh_t *h, const char *tid, const unsigned char *img, size_t len);
 /* Home screen background for the folder tile (sce_sys/pic0.dds). img NULL

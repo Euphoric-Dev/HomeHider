@@ -6,8 +6,8 @@
 Hide tiles, group games into folders, give any tile a new name, picture or background, and play a video as your wallpaper.
 
 ![PS5 payload](https://img.shields.io/badge/PS5-payload-0070d1)
-![Tested on FW 4.51 - 13.60](https://img.shields.io/badge/tested-FW%204.51-2ea44f)
-![Version 2.0.0](https://img.shields.io/badge/version-2.0.0-7a4bf2)
+![Tested on FW 4.51](https://img.shields.io/badge/tested-FW%204.51-2ea44f)
+![Version 2.1.0](https://img.shields.io/badge/version-2.1.0-7a4bf2)
 ![License GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-555)
 ![Runs with Payload Manager](https://img.shields.io/badge/runs%20with-Payload%20Manager-555)
 
@@ -22,19 +22,19 @@ Home Hider is a payload (`.elf`) for jailbroken PS5 consoles. Start it from **Pa
 
 Nothing is ever deleted. Hidden games still work, and every change can be undone.
 
-> [!IMPORTANT]
-> **DISCLAIMER: THIS WAS MADE WITH AI!**
-
 ## Features
 
 | | |
 |---|---|
-| **Hide anything** | Games, apps and system tiles such as PlayStation Store, Media Gallery, PlayStation Plus, TV & Video and All Apps. |
+| **Hide anything** | Games, apps and system tiles such as PlayStation Store, Media Gallery, PlayStation Plus, TV & Video, All Apps — and even Game Library / App Library, which the keep-hidden watchdog puts back if the PS5 restores them. |
 | **Folders** | One tile that opens a Game Library-style page with the games inside, like folders on the PS4. |
 | **Rename** | Give any tile the name you want. |
 | **Custom pictures** | Replace any tile's icon. Transparent PNGs work too. |
 | **Custom backgrounds** | Replace the big background shown when a tile is selected, for games, apps and folders. |
 | **Live wallpaper** | Play a video behind the home screen, powered by the built-in [LiveShell Engine](https://github.com/ZiZc3/LiveShell) by ZiZc3. |
+| **One home-screen list** | Your games, apps and folders in one list, in the same order as your home screen, grouped by tab. Hidden tiles sit greyed at the end. Folders appear automatically next to your games. |
+| **Reorder in place** | Use the ▲▼ arrows on any tile to move it earlier or later on its tab, then **Save order**. Home Hider re-applies your order each time it runs. |
+| **Move between tabs** | Open **Edit** on any tile or folder and move it to the other tab. A folder carries everything inside it; take a single app out of a folder to move it on its own. |
 | **Open anything** | Start any game or app from the menu, including hidden ones and web apps such as Payload Manager. |
 | **Keeps itself right** | If the PS5 brings back a tile, name, picture or background, Home Hider puts your choice back the next time it runs. |
 | **Quiet Autoload** | Runs silently when Payload Manager's Autoload starts it, and opens the menu when you launch it yourself. |
@@ -120,8 +120,6 @@ Home Hider comes with **[LiveShell Engine](https://github.com/ZiZc3/LiveShell) 1
 2. Add videos: copy `.mp4` files to a `liveshell` folder on a USB drive, or upload them from your phone or PC on LiveShell's page (`http://<PS5-IP>:9050`).
 3. Press **Use** on a video to make it your wallpaper. **Delete** removes a video from the PS5.
 
-**CHECK "Video + Icons" TO SEE SOME ICONS AND A LIVE WALLPAPER I MADE**
-
 | | |
 |---|---|
 | Videos | `.mp4`, H.264 or HEVC, 8-bit, up to 4K, with or without sound |
@@ -130,6 +128,16 @@ Home Hider comes with **[LiveShell Engine](https://github.com/ZiZc3/LiveShell) 1
 
 > [!NOTE]
 > If you already load `liveshell.elf` from Payload Manager, Home Hider sees that it's running and doesn't start a second copy. LiveShell's files are in `/data/LiveShell/`.
+
+## Reorder the home screen
+
+The PS5 sorts each tab by most-recently-played and has no manual reorder. The home-screen list shows your tiles in that same order, and lets you set your own instead.
+
+1. Use the **▲ / ▼** arrows on any tile to move it earlier or later on its tab (hidden tiles stay greyed at the end).
+2. Press **Save order**, then **Refresh home screen now**.
+3. **Automatic order** goes back to the PS5's recency sort.
+
+Because the PS5 re-sorts by recency, Home Hider re-applies your order every time it runs, so **add it to Autoload** to keep it. Everything is saved and fully reversible.
 
 ## Run it automatically
 

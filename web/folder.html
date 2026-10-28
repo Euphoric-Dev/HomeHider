@@ -209,10 +209,31 @@ function poll(job, id, name, tries) {
       return;
     }
     launching = false;
-    if (j.result === 'ok') toast(j.note + '…');
+    if (j.result === 'ok') { toast(j.note + '…'); selfClose(); }
     else if (j.result === 'other_running') ask(j.other.name, id, name);
     else toast(j.error);
   });
+}
+
+/* Close the folder page once the game is on its way, so coming back from the
+ * game lands on the home screen, not here. Pure browser close: reclaim the
+ * window with _self (WebKit then allows close), then close. The PS5 browser
+ * may ignore it; nothing here force-closes the browser. */
+function selfClose() {
+  var go = function () {
+    /* 1. reclaim the window, then ask it to close (WebKit allows this once
+     *    the page "owns" the window) */
+    try { window.open('', '_self'); } catch (e) {}
+    try { window.close(); } catch (e) {}
+    /* 2. if this page is the only thing in the browser's history, backing out
+     *    of it leaves nowhere to go, which dismisses the browser on some
+     *    consoles. Only when it's the sole entry, so we never land on an
+     *    unrelated page. */
+    try { if (history.length <= 1) history.back(); } catch (e) {}
+    try { self.close(); } catch (e) {}
+  };
+  setTimeout(go, 250);
+  setTimeout(go, 1500);
 }
 
 var askFrom = null;

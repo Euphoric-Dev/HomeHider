@@ -393,6 +393,10 @@ static void folder_json(hh_t *h, const char *tid, strbuf_t *sb) {
   sqlite3_finalize(st);
   char bgp[400];
   sb_printf(sb, ",\"custom_bg\":%s", folders_bg_path(tid, bgp, sizeof(bgp)) == 0 ? "true" : "false");
+  char fname[200];
+  long long frecent = 0;
+  title_info(h, tid, fname, sizeof(fname), &frecent); /* the folder tile's home-screen order */
+  sb_printf(sb, ",\"recent\":%lld", frecent);
   sb_printf(sb, ",\"installed\":%s,\"items\":[", tile_present(h, tid) ? "true" : "false");
 
   st = prep(h, "SELECT title_id FROM hh.folder_items WHERE folder=?1 ORDER BY pos");
@@ -647,6 +651,68 @@ static void remove_tile_files(const char *tid) {
   rmdir(p);
   snprintf(p, sizeof(p), "%s/%s", F.app_dir, tid);
   rmdir(p);
+}
+
+int folders_set_tab(hh_t *h, const char *tid, const char *tab) {
+  if (!folders_is_folder(tid) ||
+      count1(h, "SELECT count(*) FROM hh.folders WHERE title_id=?1", tid) == 0) {
+    ferr(h, "That folder doesn't exist.%s", "");
+    return -1;
+  }
+  if (!tab || (strcmp(tab, "games") && strcmp(tab, "media"))) {
+    ferr(h, "Choose the Games or Media tab.%s", "");
+    return -1;
+  }
+  if (run1(h, "UPDATE hh.folders SET tab=?2 WHERE title_id=?1", tid, tab)) return -1;
+  place_tile(h, tid, tab);
+  hh_log("folder %s: moved to the %s tab", tid, tab);
+  return 0;
+}
+
+/* Takes one app out of whatever folder it is in, leaving it back on its tab. */
+int folders_remove_member(hh_t *h, const char *tid) {
+  char folder[16] = "";
+  if (folders_of_title(h, tid, folder, sizeof(folder)) || !folder[0]) {
+    ferr(h, "That app isn't in a folder.%s", "");
+    return -1;
+  }
+  /* the remaining members, keeping their order */
+  char (*keep)[16] = calloc(FOLDER_ITEMS_MAX, 16);
+  if (!keep) return -1;
+  int n = 0;
+  sqlite3_stmt *st = prep(h, "SELECT title_id FROM hh.folder_items WHERE folder=?1 AND title_id<>?2 ORDER BY pos");
+  if (st) {
+    sqlite3_bind_text(st, 1, folder, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(st, 2, tid, -1, SQLITE_TRANSIENT);
+    while (sqlite3_step(st) == SQLITE_ROW && n < FOLDER_ITEMS_MAX)
+      snprintf(keep[n++], 16, "%s", sqlite3_column_text(st, 0));
+    sqlite3_finalize(st);
+  }
+  int rc;
+  if (n == 0) {
+    rc = folders_delete(h, folder); /* last one out: the folder goes too */
+  } else {
+    char name[FOLDER_NAME_MAX * 4 + 8] = "", tab[8] = "games", color[16] = "blue";
+    sqlite3_stmt *f = prep(h, "SELECT name, tab, color FROM hh.folders WHERE title_id=?1");
+    if (f) {
+      sqlite3_bind_text(f, 1, folder, -1, SQLITE_TRANSIENT);
+      if (sqlite3_step(f) == SQLITE_ROW) {
+        snprintf(name, sizeof(name), "%s", sqlite3_column_text(f, 0));
+        snprintf(tab, sizeof(tab), "%s", sqlite3_column_text(f, 1));
+        snprintf(color, sizeof(color), "%s", sqlite3_column_text(f, 2));
+      }
+      sqlite3_finalize(f);
+    }
+    strbuf_t items;
+    sb_init(&items);
+    for (int i = 0; i < n; i++) sb_printf(&items, "%s%s", i ? "," : "", keep[i]);
+    char out_id[16], note[160];
+    rc = items.oom ? -1 : folders_save(h, folder, name, tab, color, items.data, out_id, note, sizeof(note));
+    sb_free(&items);
+  }
+  free(keep);
+  if (rc == 0) hh_log("folder %s: took %s out", folder, tid);
+  return rc;
 }
 
 int folders_delete(hh_t *h, const char *tid) {

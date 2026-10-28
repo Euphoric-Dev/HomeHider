@@ -17,9 +17,9 @@ BUILD   := build
 HH_GITHUB_REPO ?=
 
 SRCS    := src/main.c src/hider.c src/http.c src/strbuf.c src/updater.c src/json.c src/sha256.c \
-           src/folders.c src/icons.c src/log.c src/usbpics.c src/launch.c src/custom.c src/texture.c src/liveshell.c
+           src/folders.c src/icons.c src/log.c src/usbpics.c src/launch.c src/custom.c src/texture.c src/liveshell.c src/arrange.c src/tabs.c
 HEADERS := src/hider.h src/http.h src/strbuf.h src/platform.h src/updater.h src/json.h \
-           src/sha256.h src/folders.h src/icons.h src/log.h src/usbpics.h src/launch.h src/custom.h src/texture.h src/liveshell.h src/liveshell_elf.h third_party/stb/stb_image.h third_party/stb/stb_image_write.h src/webui_html.h src/folder_html.h
+           src/sha256.h src/folders.h src/icons.h src/log.h src/usbpics.h src/launch.h src/custom.h src/texture.h src/liveshell.h src/liveshell_elf.h src/arrange.h src/tabs.h third_party/stb/stb_image.h third_party/stb/stb_image_write.h src/webui_html.h src/folder_html.h
 DEFS    := -DHH_DEFAULT_REPO='"$(HH_GITHUB_REPO)"'
 
 WARN    := -Wall -Wextra -Wno-unused-parameter

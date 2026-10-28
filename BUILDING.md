@@ -51,6 +51,7 @@ src/launch.c/.h     starting titles: web link tiles, launch jobs, "another game 
 src/custom.c/.h     renaming tiles, changing their pictures and backgrounds (app.db cells + appmeta files)
 src/texture.c/.h    background files: PNG/JPEG, DDS with BC7 (mode 6), BC1, BC3, RGBA8/BGRA8 and mips
 src/liveshell.c/.h  live wallpaper: starts the built-in LiveShell Engine, talks to its API on port 9050
+src/arrange.c/.h    pre-arrange the home screen: order via lastAccessIndex, pin via MyHome
 third_party/liveshell  LiveShell Engine 1.5.2 by ZiZc3 (GPL-3.0): liveshell.elf + its source, see NOTICE.md
 src/log.c/.h        log file shown in Diagnostics
 src/json.c/.h       small JSON reader for GitHub API replies
@@ -111,6 +112,10 @@ The chosen picture is kept as a 3840x2160 JPEG in `/data/homehider/backgrounds/`
 ### Transparency
 
 Pictures are handled as RGBA throughout. Folder colour `none` keeps the collage or custom picture see-through (RGBA `icon0.png`). With a colour, the see-through parts are put on the colour's gradient when `icon0.png` is written. Tile pictures get a dark background unless `clear=1` is sent.
+
+### Arranging the home screen
+
+`arrange.c` forces a tile order the PS5 has no stock UI for. The home row sorts by `tbl_iconinfo_<u>.lastAccessIndex` (counted by `tbl_version.access_index`). Home Hider writes arranged tiles' `lastAccessIndex` to `base - pos`, where `base` is the console's counter plus a large gap, so they sit in front in the chosen order and normal play (which gets the next, smaller index) can't catch up. "Pin" also adds the tile to the per-user `MyHome` group (`tbl_group_<u>`). The true original of every `lastAccessIndex` and pin state is saved once in state.db (`arrange_orig`), so clearing restores exactly and a pin the console already had is never removed. It is re-applied at launch like hidden tiles. API: `/api/arrange` (GET), `/api/arrange/save` (items + pinned), `/api/arrange/clear`.
 
 ### Live wallpaper (LiveShell Engine)
 

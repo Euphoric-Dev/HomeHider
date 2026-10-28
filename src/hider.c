@@ -238,7 +238,19 @@ int hh_open(hh_t *h, const char *app_db, const char *state_db) {
                    "CREATE TABLE IF NOT EXISTS custom_cells("
                    " title_id TEXT NOT NULL, kind TEXT NOT NULL, tbl TEXT NOT NULL, col TEXT NOT NULL,"
                    " keycol TEXT NOT NULL, keyval TEXT NOT NULL, orig TEXT,"
-                   " PRIMARY KEY(title_id, kind, tbl, col, keycol, keyval));",
+                   " PRIMARY KEY(title_id, kind, tbl, col, keycol, keyval));"
+                   "CREATE TABLE IF NOT EXISTS arranged("
+                   " title_id TEXT PRIMARY KEY, tab TEXT NOT NULL, pos INTEGER NOT NULL,"
+                   " pinned INTEGER NOT NULL DEFAULT 0, updated_at TEXT);"
+                   "CREATE TABLE IF NOT EXISTS arrange_orig("
+                   " title_id TEXT NOT NULL, user TEXT NOT NULL,"
+                   " orig_access INTEGER, orig_pinned INTEGER, orig_idx INTEGER,"
+                   " PRIMARY KEY(title_id, user));"
+                   "CREATE TABLE IF NOT EXISTS tab_moved("
+                   " title_id TEXT PRIMARY KEY, dest TEXT NOT NULL, created_at TEXT);"
+                   "CREATE TABLE IF NOT EXISTS tab_orig("
+                   " title_id TEXT NOT NULL, user TEXT NOT NULL, orig_disp INTEGER,"
+                   " PRIMARY KEY(title_id, user));",
                    NULL, NULL, &msg) != SQLITE_OK) {
     set_err(h, "Cannot create state.db: %s",
             msg ? msg : (sdb ? sqlite3_errmsg(sdb) : state_db));
@@ -249,6 +261,7 @@ int hh_open(hh_t *h, const char *app_db, const char *state_db) {
   }
   /* columns added in later versions (fails harmlessly when present) */
   sqlite3_exec(sdb, "ALTER TABLE custom ADD COLUMN bg_file TEXT", NULL, NULL, NULL);
+  sqlite3_exec(sdb, "ALTER TABLE arrange_orig ADD COLUMN orig_idx INTEGER", NULL, NULL, NULL);
   sqlite3_close(sdb);
 
   sqlite3_stmt *st = prep(h, "ATTACH DATABASE ?1 AS hh", state_db, NULL, NULL);
@@ -380,15 +393,12 @@ int hh_hide(hh_t *h, const char *tid) {
     set_err(h, "Invalid title id: %s", tid);
     return -1;
   }
-  if (hh_is_locked(tid)) {
-    set_err(h, "The home screen always adds this tile (%s) by itself, so it "
-               "can't be hidden from the database.", tid);
-    return -1;
-  }
   if (strncmp(tid, "HHFD", 4) == 0) {
     set_err(h, "%s is a Home Hider folder. Manage it in the Folders section.", tid);
     return -1;
   }
+  /* Game/App Library (locked tiles) can be hidden now: the PS5 may add them
+   * back, but the keep-hidden watchdog hides them again while Home Hider runs. */
   if (need_users(h)) return -1;
   if (exec(h, "BEGIN IMMEDIATE")) return -1;
 
@@ -541,15 +551,10 @@ int hh_unhide_all(hh_t *h, int *count) {
 }
 
 int hh_release_locked(hh_t *h, int *count) {
+  /* Game/App Library can now be hidden on purpose, and the watchdog keeps them
+   * hidden, so Home Hider no longer force-shows them at launch. */
+  (void)h;
   *count = 0;
-  if (h->nusers == 0) return 0;
-  for (size_t i = 0; i < sizeof(kLocked) / sizeof(kLocked[0]); i++) {
-    if (scalar(h, "SELECT count(*) FROM hh.wanted WHERE title_id=?1", kLocked[i],
-               NULL, 0) == 0)
-      continue;
-    if (hh_unhide(h, kLocked[i])) return -1;
-    (*count)++;
-  }
   return 0;
 }
 
@@ -561,7 +566,6 @@ int hh_reapply(hh_t *h, int *fixed) {
   int n = wanted_list(h, ids, WANTED_MAX), rc = n < 0 ? -1 : 0;
   for (int i = 0; i < n; i++) {
     hh_state_t s;
-    if (hh_is_locked(ids[i])) continue;
     if (hh_get_state(h, ids[i], &s)) { rc = -1; break; }
     if (!s.present || (!s.visible && !s.in_myhome)) continue;
     if (hh_hide(h, ids[i])) { rc = -1; break; }
@@ -823,10 +827,11 @@ int hh_list(hh_t *h, strbuf_t *out) {
     list_item_t *it = &items[i];
     int system = strncmp(it->id, "NPXS", 4) == 0;
     int locked = hh_is_locked(it->id);
-    int hidden = !locked && !it->vis_any && !it->pinned;
+    int hidden = !it->vis_any && !it->pinned;
     int on_home = it->vis_any && (it->pinned || (it->disp >= 0 && (it->disp & 6)));
-    /* games/apps: everything installed. system tiles: only real home tiles */
-    if (locked) continue; /* not hideable, so not offered */
+    /* games/apps: everything installed. system tiles: only real home tiles.
+     * Locked tiles (Game/App Library) can be hidden and arranged, but the PS5
+     * decides their tab, so they're flagged locked:true (no tab-move). */
     if (system ? !(on_home || it->on_list) : !(it->installed || it->on_list)) continue;
 
     /* for tiles we hid, report the tab they came from */
@@ -844,9 +849,9 @@ int hh_list(hh_t *h, strbuf_t *out) {
               (it->pinned || (hidden && it->orig_pinned)) ? "true" : "false",
               it->access == LLONG_MIN ? 0 : it->access);
     sb_json_str(out, it->folder[0] ? it->folder : NULL);
-    sb_printf(out, ",\"renamed\":%s,\"custom_icon\":%s,\"custom_bg\":%s}",
+    sb_printf(out, ",\"renamed\":%s,\"custom_icon\":%s,\"custom_bg\":%s,\"locked\":%s}",
               it->renamed ? "true" : "false", it->custom_icon ? "true" : "false",
-              it->custom_bg ? "true" : "false");
+              it->custom_bg ? "true" : "false", locked ? "true" : "false");
     first = 0;
   }
   sb_puts(out, "]");

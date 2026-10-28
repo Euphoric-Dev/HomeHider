@@ -21,6 +21,8 @@
 #include <unistd.h>
 
 #include "hider.h"
+#include "arrange.h"
+#include "tabs.h"
 #include "custom.h"
 #include "http.h"
 #include "json.h"
@@ -71,6 +73,7 @@ static char g_updated_to[32];
 static volatile int g_running = 1;
 static int g_reapplied = 0;
 static int g_custom_fixed = 0;
+static int g_arrange_fixed = 0;
 
 /* ------------------------------------------------------------------------- */
 /* paths & settings                                                          */
@@ -212,6 +215,7 @@ static void handle_status(int fd) {
   sb_json_str(&sb, upd_marker());
   sb_printf(&sb, ",\"reapplied_at_launch\":%d", g_reapplied);
   sb_printf(&sb, ",\"custom_fixed\":%d", g_custom_fixed);
+  sb_printf(&sb, ",\"arrange_fixed\":%d", g_arrange_fixed);
   sb_printf(&sb, ",\"backup\":%s", file_exists(g_backup_orig) ? "true" : "false");
   sb_puts(&sb, ",\"db\":{\"ok\":");
   sb_puts(&sb, ok && h.nusers > 0 ? "true" : "false");
@@ -311,6 +315,139 @@ static void handle_launch_status(int fd, const char *query) {
   launch_status_json(atoi(v), &sb, name_of);
   send_json(fd, 200, &sb);
   sb_free(&sb);
+}
+
+/* ---- arrange the home screen ---- */
+
+static void handle_arrange(int fd) {
+  hh_t h;
+  if (hh_open(&h, g_app_db, g_state_db)) {
+    send_error(fd, 500, h.err);
+    return;
+  }
+  strbuf_t sb;
+  sb_init(&sb);
+  sb_puts(&sb, "{\"ok\":true,\"arrange\":");
+  if (arrange_json(&h, &sb)) send_error(fd, 500, h.err);
+  else {
+    sb_puts(&sb, "}");
+    send_json(fd, 200, &sb);
+  }
+  sb_free(&sb);
+  hh_close(&h);
+}
+
+static void handle_arrange_save(int fd, http_req_t *r) {
+  unsigned char *body = NULL;
+  size_t len = 0;
+  if (http_read_body(fd, r, &body, &len, 64 * 1024)) {
+    send_error(fd, 400, "Bad request.");
+    return;
+  }
+  char *form = malloc(len + 1);
+  if (!form) {
+    free(body);
+    send_error(fd, 500, "Out of memory.");
+    return;
+  }
+  memcpy(form, body, len);
+  form[len] = '\0';
+  free(body);
+  char *items = malloc(len + 1), *pinned = malloc(len + 1);
+  if (!items || !pinned) {
+    free(form);
+    free(items);
+    free(pinned);
+    send_error(fd, 500, "Out of memory.");
+    return;
+  }
+  items[0] = pinned[0] = '\0';
+  http_query_get(form, "items", items, len + 1);
+  http_query_get(form, "pinned", pinned, len + 1);
+  free(form);
+  hh_t h;
+  if (hh_open(&h, g_app_db, g_state_db)) {
+    free(items);
+    free(pinned);
+    send_error(fd, 500, h.err);
+    return;
+  }
+  if (arrange_set(&h, items, pinned)) send_error(fd, 409, h.err);
+  else send_ok(fd, "Arrangement saved. The home screen shows it after you open and close any game, or restart.");
+  free(items);
+  free(pinned);
+  hh_close(&h);
+}
+
+static void handle_arrange_clear(int fd) {
+  hh_t h;
+  if (hh_open(&h, g_app_db, g_state_db)) {
+    send_error(fd, 500, h.err);
+    return;
+  }
+  if (arrange_clear(&h)) send_error(fd, 409, h.err);
+  else send_ok(fd, "Arrangement cleared. The home screen goes back to most-recent order.");
+  hh_close(&h);
+}
+
+/* ---- move tiles between the Games and Media tabs ---- */
+
+static void handle_tabs_moved(int fd) {
+  hh_t h;
+  if (hh_open(&h, g_app_db, g_state_db)) {
+    send_error(fd, 500, h.err);
+    return;
+  }
+  strbuf_t sb;
+  sb_init(&sb);
+  sb_puts(&sb, "{\"ok\":true,\"moved\":");
+  if (tabs_moved_json(&h, &sb)) send_error(fd, 500, h.err);
+  else {
+    sb_puts(&sb, "}");
+    send_json(fd, 200, &sb);
+  }
+  sb_free(&sb);
+  hh_close(&h);
+}
+
+static void handle_tab_move(int fd, const char *query) {
+  char tid[32], to[16] = "";
+  if (http_query_get(query, "id", tid, sizeof(tid)) || !hh_valid_tid(tid)) {
+    send_error(fd, 400, "Missing or invalid title id.");
+    return;
+  }
+  http_query_get(query, "to", to, sizeof(to));
+  hh_t h;
+  if (hh_open(&h, g_app_db, g_state_db)) {
+    send_error(fd, 500, h.err);
+    return;
+  }
+  int reset = !strcmp(to, "reset") || !strcmp(to, "original");
+  int rc;
+  if (folders_is_folder(tid))
+    rc = folders_set_tab(&h, tid, to); /* folders have no "original" tab */
+  else
+    rc = reset ? tabs_reset(&h, tid) : tabs_move(&h, tid, to);
+  if (rc) send_error(fd, 409, h.err);
+  else send_ok(fd, reset ? "Moved back to its original tab. The home screen shows it after you open and close any game, or restart."
+                         : "Moved. The home screen shows it after you open and close any game, or restart.");
+  hh_close(&h);
+}
+
+static void handle_folder_take_out(int fd, const char *query) {
+  char tid[32];
+  if (http_query_get(query, "id", tid, sizeof(tid)) || !hh_valid_tid(tid)) {
+    send_error(fd, 400, "Missing or invalid title id.");
+    return;
+  }
+  hh_t h;
+  if (hh_open(&h, g_app_db, g_state_db)) {
+    send_error(fd, 500, h.err);
+    return;
+  }
+  if (folders_remove_member(&h, tid)) send_error(fd, 409, h.err);
+  else send_ok(fd, "Taken out of the folder. It's back on its tab, and you can move it now.");
+  hh_close(&h);
 }
 
 /* ---- live wallpaper (LiveShell Engine by ZiZc3) ---- */
@@ -1002,7 +1139,8 @@ static void handle_client(int fd) {
   int cicon = post && !strcmp(p, "/api/custom/icon");
   int cbg = post && !strcmp(p, "/api/custom/bg");
   int fbg = post && !strcmp(p, "/api/folders/bg");
-  if (!upload && !fsave && !ficon && !cname && !cicon && !cbg && !fbg) http_drain(fd, &r);
+  int asave = post && !strcmp(p, "/api/arrange/save");
+  if (!upload && !fsave && !ficon && !cname && !cicon && !cbg && !fbg && !asave) http_drain(fd, &r);
 
   if (!strcmp(p, "/") || !strcmp(p, "/index.html")) {
     http_send(fd, 200, "text/html; charset=utf-8", WEBUI_HTML, WEBUI_HTML_LEN, NULL);
@@ -1032,6 +1170,10 @@ static void handle_client(int fd) {
     handle_custom_bg_get(fd, r.query);
   } else if (!strcmp(p, "/api/folder_bg")) {
     handle_folder_bg_get(fd, r.query);
+  } else if (!strcmp(p, "/api/arrange")) {
+    handle_arrange(fd);
+  } else if (!strcmp(p, "/api/tabs")) {
+    handle_tabs_moved(fd);
   } else if (!strcmp(p, "/api/live")) {
     handle_live(fd);
   } else if (!strcmp(p, "/api/live/thumb")) {
@@ -1070,6 +1212,8 @@ static void handle_client(int fd) {
     handle_folder_bg_set(fd, &r);
   } else if (!strcmp(p, "/api/folders/delete")) {
     handle_folder_delete(fd, r.query);
+  } else if (!strcmp(p, "/api/folders/take_out")) {
+    handle_folder_take_out(fd, r.query);
   } else if (!strcmp(p, "/api/clientlog")) {
     char msg[300] = "";
     http_query_get(r.query, "msg", msg, sizeof(msg));
@@ -1077,6 +1221,12 @@ static void handle_client(int fd) {
     send_ok(fd, "logged");
   } else if (!strcmp(p, "/api/launch")) {
     handle_launch(fd, r.query);
+  } else if (asave) {
+    handle_arrange_save(fd, &r);
+  } else if (!strcmp(p, "/api/arrange/clear")) {
+    handle_arrange_clear(fd);
+  } else if (!strcmp(p, "/api/tab")) {
+    handle_tab_move(fd, r.query);
   } else if (!strcmp(p, "/api/live/power")) {
     handle_live_power(fd, r.query);
   } else if (!strcmp(p, "/api/live/select")) {
@@ -1166,6 +1316,37 @@ static int open_server(void) {
   return -1;
 }
 
+/* The system makes a tile visible again after its game is played, which
+ * un-hides games that are inside folders (and anything else on the hide
+ * list), cluttering the home screen until Home Hider runs again. While Home
+ * Hider is running, this thread re-hides them by itself every few seconds,
+ * and keeps folders and the chosen order in place, so the home screen heals
+ * without re-running the payload. Re-hiding a tile while its game is still
+ * running is harmless (it doesn't touch the running game), and means the
+ * home screen already shows it hidden by the time the game is closed. */
+static void *rehide_watchdog(void *arg) {
+  (void)arg;
+  while (g_running) {
+    for (int i = 0; i < 6 && g_running; i++) sleep(1);
+    if (!g_running) break;
+    hh_t h;
+    if (hh_open(&h, g_app_db, g_state_db) != 0) continue;
+    if (h.nusers > 0) {
+      int rehidden = 0, folders = 0, arranged = 0;
+      if (g_cfg.reapply) hh_reapply(&h, &rehidden);
+      folders_reapply(&h, &folders);
+      arrange_apply(&h, &arranged);
+      int tabbed = 0;
+      tabs_apply(&h, &tabbed);
+      if (rehidden || folders || arranged || tabbed)
+        hh_log("auto re-hide: %d tile(s), %d folder(s), %d arranged, %d tab-moved — the home screen heals itself",
+               rehidden, folders, arranged, tabbed);
+    }
+    hh_close(&h);
+  }
+  return NULL;
+}
+
 int main(void) {
   signal(SIGPIPE, SIG_IGN);
   plat_init();
@@ -1212,8 +1393,10 @@ int main(void) {
       if (g_cfg.reapply) hh_reapply(&h, &g_reapplied);
       folders_reapply(&h, &g_folders_fixed); /* folder tiles always come back */
       custom_reapply(&h, &g_custom_fixed);   /* and so do new names and pictures */
-      hh_log("startup: users=%d reapplied=%d folders_fixed=%d custom_fixed=%d", h.nusers,
-             g_reapplied, g_folders_fixed, g_custom_fixed);
+      arrange_apply(&h, &g_arrange_fixed);   /* and the chosen home-screen order */
+      { int tf = 0; tabs_apply(&h, &tf); }   /* and tiles moved to the other tab */
+      hh_log("startup: users=%d reapplied=%d folders_fixed=%d custom_fixed=%d arrange_fixed=%d",
+             h.nusers, g_reapplied, g_folders_fixed, g_custom_fixed, g_arrange_fixed);
       hh_close(&h);
     }
   }
@@ -1256,8 +1439,10 @@ int main(void) {
 
   if (g_cfg.auto_check && !just_updated) upd_start_check(g_cfg.repo[0] != '\0', 1, 1);
 
-  /* live wallpaper: start the built-in LiveShell unless it is already running */
-  if (g_cfg.live) live_start_async(just_updated ? 0 : 3);
+  /* live wallpaper: start the built-in LiveShell unless it is already running.
+   * A short wait lets the ELF loader settle at boot; the rest of the time to
+   * a visible wallpaper is LiveShell's own ShellUI setup. */
+  if (g_cfg.live) live_start_async(just_updated ? 0 : 1);
 
   int first_boot_start = first_start_since_boot();
   int open_menu = !just_updated &&
@@ -1268,6 +1453,12 @@ int main(void) {
   if (open_menu && plat_launch_browser(url))
     plat_notify("Home Hider: couldn't open the browser.\nUse http://%s:%d from a phone/PC.",
                 ip[0] ? ip : "<PS5-IP>", HH_PORT);
+
+  /* keep the home screen de-cluttered after games are played */
+  {
+    pthread_t wd;
+    if (pthread_create(&wd, NULL, rehide_watchdog, NULL) == 0) pthread_detach(wd);
+  }
 
   while (g_running) {
     struct pollfd pfd = {srv, POLLIN, 0};

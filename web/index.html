@@ -57,7 +57,7 @@ h2 .n{color:var(--text);opacity:.6;margin-left:6px}
 .icon img{width:100%;height:100%;object-fit:cover;display:block}
 .icon svg{width:40px;height:40px}
 .info{flex:1;min-width:0}
-.name{font-weight:650;font-size:1.02em;overflow-wrap:anywhere;word-wrap:break-word;word-break:break-word;line-height:1.25}
+.name{font-weight:650;font-size:1.02em;overflow-wrap:break-word;word-break:normal;hyphens:none;line-height:1.25}
 .meta{color:var(--muted);font-size:.78em;margin-top:2px}
 .badge{display:inline-block;font-size:.72em;font-weight:600;padding:1px 9px;border-radius:99px;
   margin-top:6px;border:1px solid transparent}
@@ -66,6 +66,13 @@ h2 .n{color:var(--text);opacity:.6;margin-left:6px}
 .b-sys{color:var(--muted);background:var(--surface2);border-color:var(--line)}
 .btns{display:flex;flex-direction:column;flex:none}
 .btns > * + *{margin-top:8px}
+.ord{display:flex;flex-direction:column;flex:none;gap:5px}
+.ord button{min-height:28px;min-width:38px;padding:0 8px;font-size:.9em;line-height:1}
+.card.off{opacity:.5}
+.ordbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:0 0 14px;font-size:.85em;color:var(--muted)}
+.ordbar.dirty{border-color:#2f6df566;background:#13203d;color:var(--text)}
+.ordbar .sp{display:flex;gap:8px;flex:none}
 button,.btn{font:inherit;font-size:.92em;font-weight:600;color:#fff;background:var(--accent);
   border:2px solid transparent;border-radius:12px;padding:10px 20px;cursor:pointer;
   text-decoration:none;display:inline-block;min-height:48px;white-space:nowrap}
@@ -111,12 +118,25 @@ pre.show{display:block}
 .err-text{color:#ff9c95}
 details.sub{margin-top:8px}
 details.sub summary{font-size:.85em;letter-spacing:1px}
+/* a whole section that can be minimised; its summary reads like an <h2> */
+details.section{margin-top:28px;border-top:1px solid var(--line);padding-top:6px}
+details.section > summary{text-transform:none;letter-spacing:0;color:var(--text);font-size:1.3em;font-weight:650;padding:10px 0;list-style:none}
+details.section > summary::-webkit-details-marker{display:none}
+details.section > summary::before{content:"";display:inline-block;width:0;height:0;
+  border-left:8px solid var(--muted);border-top:6px solid transparent;border-bottom:6px solid transparent;
+  margin-right:12px;vertical-align:middle;transition:transform .15s}
+details.section[open] > summary::before{transform:rotate(90deg)}
+details.section > summary .sumh{vertical-align:middle}
+details.section > *:not(summary){margin-left:2px}
 .lock{color:var(--muted);font-size:.75em;max-width:150px;text-align:right}
 .sec-head{display:flex;align-items:center;justify-content:space-between;margin:28px 0 12px}
 .sec-head h2{margin:0}
 .fcard .icon{width:84px;height:84px}
 .b-fold{color:#c9b6ff;background:#2a1f4d;border-color:#4d3a8c}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:22px;margin-top:10px}
+.editbar{position:sticky;top:0;z-index:6;margin:-22px -22px 6px;padding:12px 22px;
+  background:var(--surface);border-bottom:1px solid var(--line);border-radius:20px 20px 0 0}
+.editbar button{padding:8px 16px}
 .panel h2{margin-top:0}
 .fm-msg{display:none;border-radius:12px;padding:12px 16px;margin:14px 0;background:#341818;border:1px solid #e5534b88}
 .fm-msg.show{display:block}
@@ -149,12 +169,34 @@ details.sub summary{font-size:.85em;letter-spacing:1px}
 .pickc.sel .chk{display:flex}
 .pickc .other{font-size:.65em;color:#c9b6ff;display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .foot b{color:var(--text)}
-.live-now{font-size:.9em;margin-bottom:10px}
+.live-now{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:.9em;margin-bottom:10px}
 .live-now b{color:var(--text)}
+.live-now > .badge{margin-right:8px}
+.live-now .lw-name{margin-right:8px}
+.live-hero{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+.live-ico{flex:none;width:52px;height:52px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--surface2)}
+.live-ico svg{width:30px;height:30px}
+.live-title{font-weight:650;font-size:1.05em;margin-bottom:3px}
 .card.cur{border-color:var(--accent2);background:#16244a}
 .credit{color:var(--muted);font-size:.75em;margin-top:10px}
 .credit a{color:var(--muted)}
 .why{color:#ff9c95;font-size:.75em;margin-top:4px}
+.arr-row{display:flex;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px}
+.arr-row > * + *{margin-left:10px}
+.arr-row .icon{width:48px;height:48px}
+.arr-row .nm{flex:1;min-width:0;overflow-wrap:anywhere}
+.arr-row .tb{color:var(--muted);font-size:.72em}
+.arr-row .mv{display:flex;flex-direction:column}
+.arr-row .mv button{min-height:22px;padding:0 10px;font-size:.8em;line-height:1.1}
+.arr-pin{display:flex;align-items:center;font-size:.8em;color:var(--muted);white-space:nowrap}
+.arr-pin input{width:22px;height:22px;margin-right:6px}
+.tab-row .tb{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:3px}
+.tab-row .tb .badge{margin:0}
+.tab-row .icon img{width:48px;height:48px;border-radius:10px;object-fit:cover}
+.tab-row > button{flex:none}
+.tab-sub{margin-left:22px;border-left:3px solid var(--accent2);background:var(--surface2)}
+.tab-row .mv2{display:flex;flex-direction:column;gap:6px;flex:none}
+.tab-row .mv2 button{min-height:30px;font-size:.82em;white-space:nowrap}
 .spin{display:inline-block;width:18px;height:18px;border:3px solid #ffffff55;border-top-color:#fff;
   border-radius:50%;animation:sp 1s linear infinite;vertical-align:-3px}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -176,76 +218,78 @@ details.sub summary{font-size:.85em;letter-spacing:1px}
   <div class="banner info" id="updTop"><div class="msg" id="updTopMsg"></div><button onclick="goUpdates()">See update</button></div>
 
   <div id="mainView">
-  <div class="sec-head"><h2>Folders<span class="n" id="fcount"></span></h2>
+  <div class="sec-head"><h2>Home screen<span class="n" id="tcount"></span></h2>
     <button class="ghost small" onclick="editFolder(null)">+ New folder</button></div>
-  <div id="folders"><div class="empty">Folders group games under one tile on your home screen.
-    Press <b>New folder</b> to make one.</div></div>
-
-  <div class="sec-head"><h2>Live wallpaper</h2>
-    <button class="switch" id="sw_live" aria-label="Live wallpaper" onclick="toggleLive(this)"></button></div>
-  <div id="live"><div class="empty"><span class="spin"></span>&nbsp; Checking…</div></div>
-
-  <h2>Games and apps</h2>
+  <p class="hint" style="margin:-4px 0 10px">Your games, apps and folders, grouped by the tab they sit on. Press <b>Edit</b> on any one
+    to rename it, change its picture or background, or move it to the other tab. <b>New folder</b> groups games under one tile.</p>
   <div class="toolbar">
     <input class="search" id="q" type="search" placeholder="Search by name or title ID" oninput="renderList()" autocomplete="off">
     <div class="chips" id="chips"></div>
   </div>
   <div id="list"><div class="empty"><span class="spin"></span>&nbsp; Loading your games and apps…</div></div>
 
-  <h2>Updates</h2>
-  <div class="row">
-    <div class="txt"><div id="updMsg">Checking for updates…</div><div class="hint" id="updHint"></div></div>
-    <button class="ghost" id="updCheckBtn" onclick="updCheck(this)">Check for updates</button>
-  </div>
-  <div id="updOffers"></div>
-  <details class="sub" id="updSettings">
-    <summary>Update settings</summary>
-    <div class="row">
-      <div class="txt">GitHub repository<div class="hint">Where new versions are published, for example <b>yourname/HomeHider</b>. The latest release needs a HomeHider .elf attached.</div>
-        <div class="inline"><input class="search" id="repo" placeholder="owner/name" autocomplete="off" spellcheck="false"><button class="ghost" onclick="saveRepo(this)">Save</button></div>
-      </div>
-    </div>
-    <div class="row">
-      <div class="txt">Check for updates when Home Hider starts<div class="hint">Looks on GitHub and on USB drives. Nothing is installed until you press Install.</div></div>
-      <button class="switch" id="sw_auto" aria-label="Check for updates at start" onclick="toggleSetting('auto_check')"></button>
-    </div>
-    <div class="row">
-      <div class="txt">Install from a file<div class="hint">Pick a HomeHider .elf on this phone or PC. To update from a USB drive instead, copy the .elf to the drive's top folder (or a folder named homehider) and press Check for updates.</div>
-        <div class="inline"><input type="file" id="updFile" accept=".elf">
-          <label class="hint"><input type="checkbox" id="allowOlder"> Allow older versions</label>
-          <button class="ghost" onclick="uploadFile(this)">Install file</button></div>
-      </div>
-    </div>
-  </details>
+  <div class="sec-head"><h2>Live wallpaper</h2>
+    <button class="switch" id="sw_live" aria-label="Live wallpaper" onclick="toggleLive(this)"></button></div>
+  <div id="live"><div class="empty"><span class="spin"></span>&nbsp; Checking…</div></div>
 
-  <h2>Options</h2>
+  <h2>When Home Hider starts</h2>
   <div class="row">
-    <div class="txt">When Home Hider starts<div class="hint" id="openHint"></div>
+    <div class="txt"><div class="hint" id="openHint"></div>
       <div class="chips" id="openChips" style="margin-top:10px"></div></div>
   </div>
-  <div class="row">
-    <div class="txt">Re-hide at start<div class="hint">If the PS5 brings a hidden tile back (after an update, for example), hide it again each time Home Hider runs.</div></div>
-    <button class="switch" id="sw_reapply" aria-label="Re-hide at start" onclick="toggleSetting('reapply')"></button>
-  </div>
 
-  <details id="adv">
-    <summary>Advanced</summary>
-    <div class="actions">
-      <button class="ghost" onclick="reloadShell(this)">Refresh home screen now</button>
-      <button class="ghost" onclick="act('/api/unhide_all',this)">Show everything I hid</button>
-      <button class="ghost" onclick="diag(this)">Diagnostics</button>
-      <a class="btn ghost" href="/api/backup" id="dl">Download original backup</a>
+  <details class="section" id="advAll">
+    <summary><span class="sumh">Updates &amp; advanced options</span></summary>
+    <div class="row">
+      <div class="txt"><div id="updMsg">Checking for updates…</div><div class="hint" id="updHint"></div></div>
+      <button class="ghost" id="updCheckBtn" onclick="updCheck(this)">Check for updates</button>
     </div>
-    <pre id="diag"></pre>
-    <div class="actions">
-      <button class="danger" onclick="restore(this)">Restore original backup</button>
-      <button class="danger" onclick="quitApp(this)">Quit Home Hider</button>
+    <div id="updOffers"></div>
+    <div class="row">
+      <div class="txt">Keep tiles hidden<div class="hint">If the PS5 brings a hidden tile back — after an update, or after you play a game that was inside a folder — Home Hider hides it again by itself, every few seconds while it's running. Turn off to leave the PS5's changes alone.</div></div>
+      <button class="switch" id="sw_reapply" aria-label="Keep tiles hidden" onclick="toggleSetting('reapply')"></button>
     </div>
-    <p class="hint">"Refresh home screen now" restarts the home screen process. If it stays black for more than a few seconds, press the PS button or restart the console. "Restore original backup" puts back the database copy taken the first time Home Hider ran; games installed after that may need Safe Mode &gt; Rebuild Database to reappear.</p>
+
+    <details class="sub" id="updSettings">
+      <summary>Update settings</summary>
+      <div class="row">
+        <div class="txt">GitHub repository<div class="hint">Where new versions are published, for example <b>yourname/HomeHider</b>. The latest release needs a HomeHider .elf attached.</div>
+          <div class="inline"><input class="search" id="repo" placeholder="owner/name" autocomplete="off" spellcheck="false"><button class="ghost" onclick="saveRepo(this)">Save</button></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="txt">Check for updates when Home Hider starts<div class="hint">Looks on GitHub and on USB drives. Nothing is installed until you press Install.</div></div>
+        <button class="switch" id="sw_auto" aria-label="Check for updates at start" onclick="toggleSetting('auto_check')"></button>
+      </div>
+      <div class="row">
+        <div class="txt">Install from a file<div class="hint">Pick a HomeHider .elf on this phone or PC. To update from a USB drive instead, copy the .elf to the drive's top folder (or a folder named homehider) and press Check for updates.</div>
+          <div class="inline"><input type="file" id="updFile" accept=".elf">
+            <label class="hint"><input type="checkbox" id="allowOlder"> Allow older versions</label>
+            <button class="ghost" onclick="uploadFile(this)">Install file</button></div>
+        </div>
+      </div>
+    </details>
+
+    <details id="adv">
+      <summary>More &amp; troubleshooting</summary>
+      <div class="actions">
+        <button class="ghost" onclick="reloadShell(this)">Refresh home screen now</button>
+        <button class="ghost" onclick="act('/api/unhide_all',this)">Show everything I hid</button>
+        <button class="ghost" onclick="diag(this)">Diagnostics</button>
+        <a class="btn ghost" href="/api/backup" id="dl">Download original backup</a>
+      </div>
+      <pre id="diag"></pre>
+      <div class="actions">
+        <button class="danger" onclick="restore(this)">Restore original backup</button>
+        <button class="danger" onclick="quitApp(this)">Quit Home Hider</button>
+      </div>
+      <p class="hint">"Refresh home screen now" restarts the home screen process. If it stays black for more than a few seconds, press the PS button or restart the console. "Restore original backup" puts back the database copy taken the first time Home Hider ran; games installed after that may need Safe Mode &gt; Rebuild Database to reappear.</p>
+    </details>
   </details>
 
   </div>
 <div class="panel" id="editorView" style="display:none">
+    <div class="editbar"><button class="ghost" onclick="closeFolder()">&larr; Back</button></div>
     <h2 id="fmTitle">New folder</h2>
     <div class="field"><div class="lbl">Name</div>
       <input class="search" id="fmName" maxlength="48" placeholder="For example: Sports" autocomplete="off" style="width:100%"></div>
@@ -288,6 +332,7 @@ details.sub summary{font-size:.85em;letter-spacing:1px}
   </div>
 
   <div class="panel" id="tileView" style="display:none">
+    <div class="editbar"><button class="ghost" onclick="closeTile()">&larr; Back</button></div>
     <h2>Name, picture and background</h2>
     <div class="field"><div class="lbl">Name on the home screen</div>
       <input class="search" id="teName" maxlength="64" autocomplete="off" style="width:100%">
@@ -314,6 +359,8 @@ details.sub summary{font-size:.85em;letter-spacing:1px}
             <input type="file" id="teBgFile" accept="image/*" onchange="tePickBgFile()"></div></div></div>
       <div id="teBgUsbHome"></div>
       <div class="hint">Use a wide picture (16:9, ideally 3840&times;2160). It's cropped from the middle and saved in the same format as the game's own background. Saving can take up to 10 seconds.</div></div>
+    <div class="field" id="teMoveField"><div class="lbl">Tab</div>
+      <div id="teMove"></div></div>
     <div class="fm-msg" id="teMsg"></div>
     <div class="actions">
       <button onclick="saveTile(this)">Save</button>
@@ -481,11 +528,36 @@ function matches(t, f) {
   return true;
 }
 
+/* Everything the home-screen list shows: apps/games plus folders, each a
+ * uniform entry so grouping, filtering and search treat them the same. */
+function listEntries() {
+  var out = [];
+  for (var i = 0; i < tiles.length; i++) {
+    var t = tiles[i];
+    out.push({ kind: 'app', id: t.id, name: t.name, tab: t.tab, hidden: t.hidden, recent: t.recent || 0, t: t });
+  }
+  for (var f = 0; f < folders.length; f++) {
+    var fo = folders[f];
+    out.push({ kind: 'folder', id: fo.id, name: fo.name, tab: fo.tab === 'media' ? 'media' : 'games',
+               hidden: false, recent: fo.recent || 0, f: fo });
+  }
+  return out;
+}
+
+/* a tile is "on the home screen" (orderable) when it's visible and not tucked in a folder */
+function onScreen(e) { return e.kind === 'folder' ? true : (!e.t.hidden && !e.t.folder); }
+
+function matchesEntry(e, f) {
+  if (f === 'hidden') return e.kind === 'app' && e.t.hidden;
+  if (f === 'games' || f === 'media') return e.tab === f;
+  return true;
+}
+
 function renderChips() {
-  var html = '';
+  var all = listEntries(), html = '';
   for (var i = 0; i < FILTERS.length; i++) {
     var f = FILTERS[i], n = 0;
-    for (var k = 0; k < tiles.length; k++) if (matches(tiles[k], f[0])) n++;
+    for (var k = 0; k < all.length; k++) if (matchesEntry(all[k], f[0])) n++;
     html += '<button class="chip' + (filter === f[0] ? ' on' : '') + '" onclick="setFilter(\'' + f[0] + '\')">' +
       f[1] + ' <span style="opacity:.7">' + n + '</span></button>';
   }
@@ -494,7 +566,14 @@ function renderChips() {
 
 function setFilter(f) { filter = f; renderList(); }
 
-function card(t) {
+/* up/down controls that reorder a tile within its tab */
+function ordCtrl(tab, idx, count) {
+  return '<span class="ord">' +
+    '<button class="ghost"' + (idx === 0 ? ' disabled' : '') + ' title="Move earlier" onclick="ordMove(\'' + tab + '\',' + idx + ',-1)">▲</button>' +
+    '<button class="ghost"' + (idx === count - 1 ? ' disabled' : '') + ' title="Move later" onclick="ordMove(\'' + tab + '\',' + idx + ',1)">▼</button></span>';
+}
+
+function card(t, move) {
   var badge;
   if (t.hidden) badge = '<span class="badge b-hid">' + (t.on_list ? 'Hidden' : 'Hidden by the system') + '</span>';
   else badge = '<span class="badge b-vis">Visible</span>' + (t.on_list ? ' <span class="badge b-hid">Came back</span>' : '');
@@ -515,37 +594,162 @@ function card(t) {
   if (t.custom_bg) changes.push('New background');
   if (changes.length) badge += ' <span class="badge b-sys">' + changes.join(', ') + '</span>';
   var fallback = svg(SYS_ICONS[t.id] || (t.kind === 'system' ? SYS_ICON : GAME_ICON));
-  return '<div class="card' + (t.hidden ? ' hidden' : '') + '">' +
+  var off = (t.hidden || t.folder) ? ' off' : '';
+  return '<div class="card' + (t.hidden ? ' hidden' : '') + off + '">' + (move || '') +
     '<div class="icon" data-id="' + t.id + '">' + fallback + '</div>' +
     '<div class="info"><div class="name">' + esc(t.name) + '</div>' +
     '<div class="meta">' + esc(t.id) + '</div>' + badge + '</div>' +
     '<div class="btns">' + main + open + '</div></div>';
 }
 
+function folderCard(f, move) {
+  var n = f.items.length;
+  var badge = '<span class="badge b-fold">Folder</span>' +
+    (f.installed ? '' : ' <span class="badge b-hid">Tile missing: open Edit, then Save</span>');
+  return '<div class="card">' + (move || '') +
+    '<div class="icon"><img alt="" src="/api/folder_icon?id=' + f.id + '&v=' + Date.now() + '"></div>' +
+    '<div class="info"><div class="name">' + esc(f.name) + '</div>' +
+    '<div class="meta">' + n + ' game' + (n === 1 ? '' : 's') + ' inside</div>' + badge + '</div>' +
+    '<div class="btns"><button onclick="editFolder(\'' + f.id + '\')">Edit</button>' +
+    '<a class="btn ghost small" href="/folder/' + f.id + '"' + (LOCAL ? '' : ' target="_blank"') + '>Open</a></div></div>';
+}
+
+function entryCard(e, move) { return e.kind === 'folder' ? folderCard(e.f, move) : card(e.t, move); }
+
+/* ---- inline ordering (merged "arrange home screen") ---- */
+var orderOverride = {};   /* tab -> [id,...] while the user is reordering */
+var arrangeOn = false;    /* a saved custom order is currently applied */
+
+/* Game/App Library: the PS5 fixes their position, so they can't be reordered. */
+function isFixed(e) { return e.kind === 'app' && e.t.locked; }
+
+function tabVisible(tab) {
+  var all = listEntries(), vis = [];
+  for (var i = 0; i < all.length; i++)
+    if (all[i].tab === tab && onScreen(all[i]) && !isFixed(all[i])) vis.push(all[i]);
+  return vis;
+}
+/* the visible tiles of a tab, in the order to show: the user's pending order,
+ * otherwise the real home-screen order (most-recent / arranged first) */
+function visOrder(tab) {
+  var vis = tabVisible(tab);
+  if (orderOverride[tab]) {
+    var by = {}, out = [];
+    for (var i = 0; i < vis.length; i++) by[vis[i].id] = vis[i];
+    for (var k = 0; k < orderOverride[tab].length; k++) {
+      var id = orderOverride[tab][k];
+      if (by[id]) { out.push(by[id]); delete by[id]; }
+    }
+    for (var m = 0; m < vis.length; m++) if (by[vis[m].id]) out.push(vis[m]);
+    return out;
+  }
+  return vis.sort(function (a, b) { return (b.recent - a.recent) || (a.name < b.name ? -1 : 1); });
+}
+
+function orderDirty() { for (var k in orderOverride) if (orderOverride[k]) return true; return false; }
+
+function ordMove(tab, idx, dir) {
+  if (!orderOverride[tab]) orderOverride[tab] = visOrder(tab).map(function (e) { return e.id; });
+  var o = orderOverride[tab], j = idx + dir;
+  if (j < 0 || j >= o.length) return;
+  var t = o[idx]; o[idx] = o[j]; o[j] = t;
+  renderList();
+}
+
+function ordSave(btn) {
+  busy(btn, true);
+  var items = [];
+  for (var s = 0; s < SECTIONS.length; s++) {
+    var vis = visOrder(SECTIONS[s][0]);
+    for (var i = 0; i < vis.length; i++) items.push(vis[i].id);
+  }
+  var x = new XMLHttpRequest();
+  x.open('POST', '/api/arrange/save', true);
+  x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  x.timeout = 60000;
+  x.onload = function () {
+    busy(btn, false);
+    var j; try { j = JSON.parse(x.responseText); } catch (e) { j = { ok: false, error: 'HTTP ' + x.status }; }
+    if (!j.ok) { banner('err', esc(j.error)); return; }
+    orderOverride = {};
+    banner('info', esc(j.note), '<button class="ghost" onclick="reloadShell(this)">Refresh home screen now</button>');
+    loadArrange(); loadFolders(function () { loadList(); });
+  };
+  x.onerror = x.ontimeout = function () { busy(btn, false); banner('err', 'Home Hider stopped responding.'); };
+  x.send('items=' + encodeURIComponent(items.join(',')) + '&pinned=');
+}
+
+function ordUndo() { orderOverride = {}; renderList(); }
+
+function ordAuto(btn) {
+  confirmTwice(btn, 'Press again for automatic order', function () {
+    req('POST', '/api/arrange/clear', function (j) {
+      if (!j.ok) { banner('err', esc(j.error)); return; }
+      orderOverride = {};
+      banner('info', esc(j.note), '<button class="ghost" onclick="reloadShell(this)">Refresh home screen now</button>');
+      loadArrange(); loadFolders(function () { loadList(); });
+    });
+  });
+}
+
+function orderBar() {
+  if (orderDirty())
+    return '<div class="ordbar dirty"><span>Order changed. It takes effect on your home screen when you save.</span>' +
+      '<span class="sp"><button onclick="ordSave(this)">Save order</button>' +
+      '<button class="ghost" onclick="ordUndo()">Undo</button></span></div>';
+  if (arrangeOn)
+    return '<div class="ordbar"><span>Your own order is on. Use the ▲▼ arrows to change it, or go back to the PS5\'s automatic order.</span>' +
+      '<span class="sp"><button class="ghost small" onclick="ordAuto(this)">Automatic order</button></span></div>';
+  return '<p class="hint" style="margin:-2px 0 10px">Tip: use the <b>▲▼</b> arrows on a tile to move it earlier or later on its tab. Hidden tiles stay at the end.</p>';
+}
+
 function renderList() {
   renderChips();
+  var all = listEntries();
+  document.getElementById('tcount').textContent = all.length ? all.length : '';
   var q = document.getElementById('q').value.toLowerCase().replace(/^\s+|\s+$/g, '');
-  var shown = [];
-  for (var i = 0; i < tiles.length; i++) {
-    var t = tiles[i];
-    if (!matches(t, filter)) continue;
-    if (q && t.name.toLowerCase().indexOf(q) < 0 && t.id.toLowerCase().indexOf(q) < 0) continue;
-    shown.push(t);
-  }
-  var html = '';
-  if (!shown.length) {
-    html = '<div class="empty">' + (tiles.length ? 'Nothing matches.' : 'No games or apps found.') + '</div>';
-  } else if (filter === 'all' && !q) {
-    for (var s = 0; s < SECTIONS.length; s++) {
-      var part = '', n = 0;
-      for (var k = 0; k < shown.length; k++) if (shown[k].tab === SECTIONS[s][0]) { part += card(shown[k]); n++; }
-      if (n) html += '<h2>' + SECTIONS[s][1] + '<span class="n">' + n + '</span></h2><div class="grid">' + part + '</div>';
+  var grouped = filter === 'all' && !q;
+
+  if (!grouped) {
+    var shown = [];
+    for (var i = 0; i < all.length; i++) {
+      var e = all[i];
+      if (!matchesEntry(e, filter)) continue;
+      if (q && e.name.toLowerCase().indexOf(q) < 0 && e.id.toLowerCase().indexOf(q) < 0) continue;
+      shown.push(e);
     }
-  } else {
-    html = '<div class="grid" style="margin-top:14px">';
-    for (var m = 0; m < shown.length; m++) html += card(shown[m]);
-    html += '</div>';
+    var fhtml = shown.length ? '<div class="grid" style="margin-top:14px">' : '';
+    for (var m = 0; m < shown.length; m++) fhtml += entryCard(shown[m]);
+    fhtml += shown.length ? '</div>' : '<div class="empty">' + (all.length ? 'Nothing matches.' : 'No games or apps found.') + '</div>';
+    document.getElementById('list').innerHTML = fhtml;
+    loadIcons();
+    return;
   }
+
+  var html = orderBar(), any = 0;
+  function byRecent(x, y) { return (y.recent - x.recent) || (x.name < y.name ? -1 : 1); }
+  for (var s = 0; s < SECTIONS.length; s++) {
+    var tab = SECTIONS[s][0];
+    var vis = visOrder(tab);                 /* movable tiles, in the chosen order */
+    var fixed = [];                          /* Game/App Library: visible but can't be reordered */
+    var off = [];                            /* hidden apps and folder members, greyed */
+    for (var a = 0; a < all.length; a++) {
+      var e = all[a];
+      if (e.tab !== tab) continue;
+      if (isFixed(e) && !e.t.hidden) fixed.push(e);
+      else if (!onScreen(e)) off.push(e);
+    }
+    fixed.sort(byRecent);
+    off.sort(byRecent);
+    if (!vis.length && !fixed.length && !off.length) continue;
+    any = 1;
+    var part = '';
+    for (var c = 0; c < vis.length; c++) part += entryCard(vis[c], ordCtrl(tab, c, vis.length));
+    for (var f = 0; f < fixed.length; f++) part += entryCard(fixed[f]);   /* no arrows, after the movable tiles */
+    for (var o = 0; o < off.length; o++) part += entryCard(off[o]);
+    html += '<h2>' + SECTIONS[s][1] + '<span class="n">' + (vis.length + fixed.length + off.length) + '</span></h2><div class="grid">' + part + '</div>';
+  }
+  if (!any) html = '<div class="empty">No games or apps found.</div>';
   document.getElementById('list').innerHTML = html;
   loadIcons();
 }
@@ -785,6 +989,8 @@ function offer(title, notes, page, buttons, small) {
 }
 
 function goUpdates() {
+  var adv = document.getElementById('advAll');
+  if (adv) adv.open = true;
   var el = document.getElementById('updOffers');
   if (el.scrollIntoView) el.scrollIntoView();
   var b = el.querySelector('button');
@@ -931,25 +1137,9 @@ function loadFolders(after) {
   });
 }
 
+/* Folders now live inside the main home-screen list, grouped by tab. */
 function renderFolders() {
-  document.getElementById('fcount').textContent = folders.length ? folders.length : '';
-  if (!folders.length) {
-    document.getElementById('folders').innerHTML = '<div class="empty">Folders group games under one tile on your home screen. ' +
-      'Press <b>New folder</b> to make one.</div>';
-    return;
-  }
-  var html = '<div class="grid">';
-  for (var i = 0; i < folders.length; i++) {
-    var f = folders[i];
-    html += '<div class="card fcard"><div class="icon"><img alt="" src="/api/folder_icon?id=' + f.id + '&v=' + Date.now() + '"></div>' +
-      '<div class="info"><div class="name">' + esc(f.name) + '</div>' +
-      '<div class="meta">' + f.items.length + ' game' + (f.items.length === 1 ? '' : 's') + ' &middot; ' +
-      (f.tab === 'media' ? 'Media tab' : 'Games tab') + '</div>' +
-      (f.installed ? '' : '<span class="badge b-hid">Tile missing: press Edit, then Save</span>') + '</div>' +
-      '<div class="btns"><button onclick="editFolder(\'' + f.id + '\')">Edit</button>' +
-      '<a class="btn ghost small" href="/folder/' + f.id + '">Open</a></div></div>';
-  }
-  document.getElementById('folders').innerHTML = html + '</div>';
+  if (tiles.length) renderList();
 }
 
 function editFolder(id) {
@@ -1306,12 +1496,72 @@ function editTile(id) {
     document.getElementById('teOrigName').style.display = te.renamed ? '' : 'none';
     document.getElementById('tePicField').style.display = te.can_icon ? '' : 'none';
     teMsg('');
+    teSyncInfo();
     renderTe();
+    renderTeMove();
     document.getElementById('mainView').style.display = 'none';
     document.getElementById('editorView').style.display = 'none';
     document.getElementById('tileView').style.display = '';
     window.scrollTo(0, 0);
     if (te.can_rename) nm.focus();
+  });
+}
+
+/* pull the tile's current tab / folder / locked state from the loaded list */
+function teSyncInfo() {
+  var li = null;
+  for (var i = 0; i < tiles.length; i++) if (tiles[i].id === te.id) li = tiles[i];
+  te._tab = li ? li.tab : 'none';
+  te._folder = li ? li.folder : null;
+  te._locked = li ? !!li.locked : false;
+}
+
+/* the "Move to Games/Media Tab" control shown above Save */
+function renderTeMove() {
+  var box = document.getElementById('teMove');
+  if (!box) return;
+  if (te._folder) {
+    box.innerHTML = '<div class="hint">This app is inside the folder <b>' + esc(folderName(te._folder)) +
+      '</b>. Take it out to put it back on its own tab, then you can move it.</div>' +
+      '<button class="ghost" onclick="teTakeOut(this)">Take out of folder</button>';
+    return;
+  }
+  if (te._locked) {
+    box.innerHTML = '<div class="hint">The PS5 controls where this tile sits, so Home Hider can\'t move or reorder it. ' +
+      'You can still hide it.</div>';
+    return;
+  }
+  var on = te._tab === 'games' ? 'On the <b>Games</b> tab.' : te._tab === 'media' ? 'On the <b>Media</b> tab.' : 'Not on a tab yet.';
+  var h = '<div class="hint">' + on + ' The change shows after you open and close any game, or restart.</div><div class="inline">';
+  if (te._tab === 'games') h += '<button class="ghost" onclick="teMove(\'media\',this)">Move to Media Tab</button>';
+  else if (te._tab === 'media') h += '<button class="ghost" onclick="teMove(\'games\',this)">Move to Games Tab</button>';
+  else h += '<button class="ghost" onclick="teMove(\'games\',this)">Move to Games Tab</button>' +
+            '<button class="ghost" onclick="teMove(\'media\',this)">Move to Media Tab</button>';
+  if (tabMoved[te.id]) h += '<button class="ghost small" onclick="teMove(\'reset\',this)">Back to original tab</button>';
+  box.innerHTML = h + '</div>';
+}
+
+function teAfterMove() {
+  loadFolders(function () { loadList(function () { teSyncInfo(); loadTabs(renderTeMove); }); });
+}
+
+function teMove(to, btn) {
+  busy(btn, true);
+  req('POST', '/api/tab?id=' + te.id + '&to=' + to, function (j) {
+    busy(btn, false);
+    if (!j.ok) { teMsg(esc(j.error)); return; }
+    teMsg(esc(j.note), true);
+    teAfterMove();
+  });
+}
+
+function teTakeOut(btn) {
+  busy(btn, true);
+  req('POST', '/api/folders/take_out?id=' + te.id, function (j) {
+    busy(btn, false);
+    if (!j.ok) { teMsg(esc(j.error)); return; }
+    teMsg(esc(j.note), true);
+    teAfterMove();
   });
 }
 
@@ -1470,20 +1720,24 @@ function renderLive() {
   var credit = '<div class="credit">Live wallpapers by <b>LiveShell Engine ' + esc(j.version) +
     '</b> by ZiZc3 (<a href="https://github.com/ZiZc3/LiveShell">github.com/ZiZc3/LiveShell</a>, GPL-3.0), built on OnionHEN. Built into Home Hider.</div>';
   if (!j.enabled) {
-    h = '<div class="row"><div class="txt">Play a video behind your home screen.' +
-      '<div class="hint">Turn this on to start LiveShell Engine, which comes built into Home Hider. It then starts with Home Hider every time.</div>' +
-      credit + '</div></div>';
+    h = '<div class="live-hero"><div class="live-ico">' + svg(FILM) + '</div>' +
+      '<div><div class="live-title">Play a video behind your home screen</div>' +
+      '<div class="hint">Flip the switch at the top right to turn it on. LiveShell Engine is built into Home Hider, ' +
+      'and once on it starts automatically with Home Hider every time.</div></div></div>' + credit;
   } else if (!j.running) {
-    h = '<div class="row"><div class="txt"><span class="spin"></span>&nbsp; Starting LiveShell…' +
-      '<div class="hint">' + (livePolls >= 30 ? 'LiveShell hasn\'t started. Check that Payload Manager (and its ELF loader) is running, then switch Live wallpaper off and on again. Advanced &gt; Diagnostics shows the steps.'
-      : 'The wallpaper appears in a few seconds.') + '</div>' + credit + '</div></div>';
+    h = '<div class="live-hero"><div class="live-ico"><span class="spin"></span></div>' +
+      '<div><div class="live-title">Starting live wallpaper…</div>' +
+      '<div class="hint">' + (livePolls >= 30 ? 'LiveShell hasn\'t started. Check that Payload Manager (and its ELF loader) is running, then switch Live wallpaper off and on again. Updates &amp; advanced options &gt; More &gt; Diagnostics shows the steps.'
+      : 'Your wallpaper appears in a few seconds.') + '</div></div></div>' + credit;
   } else {
     var st = j.state || {}, vids = st.videos || [], cur = '';
     for (var i = 0; i < vids.length; i++) if (vids[i].path === st.current) cur = vids[i].name;
-    h = '<div class="live-now">' + (cur ? 'Playing: <b>' + esc(cur) + '</b>' : 'No video picked yet.') +
-      (st.status ? ' <span class="hint">(' + esc(st.status) + ')</span>' : '') + '</div>';
+    h = '<div class="live-now"><span class="badge b-vis">On</span>' +
+      '<span class="lw-name">' + (cur ? 'Playing <b>' + esc(cur) + '</b>' : 'Pick a video below to set your wallpaper.') +
+      (st.status ? ' <span class="hint">(' + esc(st.status) + ')</span>' : '') + '</span>' +
+      '<button class="ghost small" onclick="loadLive()" style="margin-left:auto">Refresh</button></div>';
     if (!vids.length) {
-      h += '<div class="empty">No videos yet. Add some (see below), then press Refresh.</div>';
+      h += '<div class="empty">No videos yet. Add one below, then press Refresh.</div>';
     } else {
       h += '<div class="grid">';
       for (var k = 0; k < vids.length; k++) {
@@ -1499,11 +1753,10 @@ function renderLive() {
       }
       h += '</div>';
     }
-    h += '<div class="row" style="margin-top:12px"><div class="txt">Add videos' +
+    h += '<div class="row" style="margin-top:12px"><div class="txt">Add your own videos' +
       '<div class="hint">Copy <b>.mp4</b> files (H.264 or HEVC, up to 4K) to a <b>liveshell</b> folder on a USB drive, or upload them from your phone or PC at <b>http://' +
-      esc(st.ip || 'PS5-IP') + ':' + j.port + '</b>.</div></div>' +
-      '<button class="ghost small" onclick="loadLive()">Refresh</button></div>' +
-      '<div class="row"><div class="txt">More LiveShell settings<div class="hint">Looks, sound, playlists, a video per game, and Discover (download wallpapers).</div></div>' +
+      esc(st.ip || 'PS5-IP') + ':' + j.port + '</b>.</div></div></div>' +
+      '<div class="row"><div class="txt">More LiveShell settings<div class="hint">Looks, sound, playlists, a different video per game, and Discover (download wallpapers).</div></div>' +
       '<a class="btn ghost small" href="' + liveAddr() + '"' + (LOCAL ? '' : ' target="_blank"') + '>Open LiveShell</a></div>' + credit;
   }
   document.getElementById('live').innerHTML = h;
@@ -1542,14 +1795,37 @@ function liveDelete(k, btn) {
   confirmTwice(btn, 'Press again', function () { liveAct('delete', k, btn); });
 }
 
+/* ---------- custom order (shown inline in the list via ▲▼) ---------- */
+
+function loadArrange() {
+  req('GET', '/api/arrange', function (j) {
+    arrangeOn = !!(j.ok && j.arrange && j.arrange.on);
+    if (tiles.length) renderList();
+  });
+}
+
+/* ---------- which tiles Home Hider has moved (for "Back to original tab") ---------- */
+
+var tabMoved = {};   /* id -> dest */
+
+function loadTabs(after) {
+  req('GET', '/api/tabs', function (j) {
+    tabMoved = {};
+    if (j.ok) for (var i = 0; i < j.moved.length; i++) tabMoved[j.moved[i].id] = j.moved[i].dest;
+    if (after) after();
+  });
+}
+
 function openFromHash() {
   var m = location.hash.match(/^#folder=([A-Z0-9]{9})$/);
   if (m) editFolder(m[1]);
 }
 
 loadStatus();
-loadFolders(function () { loadList(openFromHash); });
+loadFolders(function () { loadList(function () { openFromHash(); }); });
 loadLive();
+loadArrange();
+loadTabs();
 
 loadUpd();
 setTimeout(loadUpd, 3000);

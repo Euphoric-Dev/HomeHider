@@ -14,7 +14,7 @@
 #include "strbuf.h"
 #include "third_party/sqlite/sqlite3.h"
 
-#define HH_VERSION      "2.0.0"
+#define HH_VERSION      "2.1.0"
 #define HH_MAX_USERS    16
 #define HH_USER_LEN     48
 #define HH_BIT_GAMES    0x02

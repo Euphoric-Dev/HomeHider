@@ -53,7 +53,8 @@ APPS = [
     ("NPXS40139", "App Library", 0xBC, 1, 2, None, None),
     ("NPXS40056", "All Apps", 0xBC, 1, 2, None, None),
 ]
-EXPECTED = {STORE, GALLERY, PLUS, "PPSA01325", "CUSA00900", "NPXS40053", "CUSA01065", "PPSA02000", "NPXS40056"}
+EXPECTED = {STORE, GALLERY, PLUS, "PPSA01325", "CUSA00900", "NPXS40053", "CUSA01065", "PPSA02000", "NPXS40056",
+            LIBRARY, "NPXS40139"}
 
 
 def make_db(path, layout="normal"):
@@ -185,26 +186,36 @@ def tile(_unused, tid):
 # locked tiles hidden by an older version are put back
 # ---------------------------------------------------------------------------
 
-def locked_migration_tests(tmp):
-    print("locked tiles hidden by v0.2 are restored at launch")
-    appdb = os.path.join(tmp, "mig.db")
-    data = os.path.join(tmp, "mig-data")
+def library_hide_tests(tmp):
+    print("Game/App Library can be hidden and stay hidden")
+    appdb = os.path.join(tmp, "libhide.db")
+    data = os.path.join(tmp, "libhide-data")
     make_db(appdb)
     original = dump(appdb)
-    s = Server(appdb, data)          # creates state.db
-    s.stop()
-    st = sqlite3.connect(os.path.join(data, "state.db"))
-    con = sqlite3.connect(appdb)
-    for u in USERS:
-        con.execute(f'UPDATE "tbl_iconinfo_{u}" SET visible=0, dispLocation=? WHERE titleId=?', (0x88, LIBRARY))
-        st.execute("INSERT INTO hidden VALUES(?,?,?,?,datetime('now'))", (LIBRARY, u, 1, 0x8A))
-    st.execute("INSERT INTO wanted VALUES(?, datetime('now'))", (LIBRARY,))
-    con.commit(); st.commit(); con.close(); st.close()
     s = Server(appdb, data)
-    code, j = http("GET", "/api/status")
-    check(j["released_locked"] == 1, "status reports 1 locked tile released")
-    check(dump(appdb) == original, "Game Library row back to its original values")
-    check(q(os.path.join(data, "state.db"), "SELECT count(*) FROM wanted")[0][0] == 0, "no longer on the hide list")
+    by_id, _ = listing()
+    check(by_id[LIBRARY]["locked"] and not by_id[LIBRARY]["hidden"], "Game Library listed, locked, visible at start")
+    code, r = http("POST", "/api/hide?id=" + LIBRARY)
+    check(code == 200 and vis(appdb, LIBRARY) == [0, 0], "Game Library can be hidden")
+    check(listing()[0][LIBRARY]["hidden"], "the list shows Game Library hidden now")
+    code, r = http("POST", "/api/hide?id=NPXS40139")
+    check(code == 200 and vis(appdb, "NPXS40139") == [0, 0], "App Library can be hidden too")
+    # the PS5 decides their tab, so tab-move is still refused
+    code, r = http("POST", "/api/tab?id=" + LIBRARY + "&to=media")
+    check(code == 409 and "PS5 decides" in r["error"], "Library still can't be moved between tabs")
+    code, st = http("GET", "/api/status")
+    check(st["released_locked"] == 0, "Library is no longer force-shown at launch")
+    # the system brings Game Library back; the launch re-hide puts it back
+    s.stop()
+    for u in USERS:
+        qx(appdb, f'UPDATE "tbl_iconinfo_{u}" SET visible=1 WHERE titleId=?', LIBRARY)
+    s = Server(appdb, data)
+    code, st = http("GET", "/api/status")
+    check(st["reapplied_at_launch"] >= 1 and vis(appdb, LIBRARY) == [0, 0],
+          "Home Hider re-hides Game Library after the system restores it")
+    http("POST", "/api/unhide?id=" + LIBRARY)
+    http("POST", "/api/unhide?id=NPXS40139")
+    check(dump(appdb) == original, "showing both Library tiles again restores the original database")
     s.stop()
 
 
@@ -995,6 +1006,7 @@ def launch_tests(tmp):
     check(b"launch_status" in page and b"close_running" in page and b"location.href = j.url" in page and
           b"close=1" not in page,
           "folder page polls, asks about the running game and opens web links")
+    check(b"selfClose" in page and b"window.close" in page, "folder page closes itself after a game starts")
     menu = http("GET", "/", raw=True)[1]
     check(b"launch_status" in menu and b"close_running" in menu, "menu Open does the same")
     s.stop()
@@ -1412,6 +1424,183 @@ class RecordingLoader:
         self.sock.close()
 
 
+def watchdog_tests(tmp):
+    print("auto re-hide after playing a game (background watchdog)")
+    appdb = os.path.join(tmp, "wd.db")
+    data = os.path.join(tmp, "wd-data")
+    apps = os.path.join(tmp, "wd-apps")
+    icons = os.path.join(tmp, "wd-icons")
+    os.makedirs(icons)
+    for tid in ("PPSA01325", "CUSA00900"):
+        open(os.path.join(icons, tid + ".png"), "wb").write(tiny_png(64, 64, (200, 40, 90)))
+    make_db(appdb)
+    s = Server(appdb, data, {"HH_USER_APP_DIR": apps, "HH_ICON_DIR": icons})
+
+    # a game hidden on its own, and one tucked inside a folder
+    http("POST", "/api/hide?id=CUSA00900")
+    form("/api/folders/save", {"name": "Games", "items": "PPSA01325"})
+    check(vis(appdb, "PPSA01325") == [0, 0] and vis(appdb, "CUSA00900") == [0, 0], "both hidden to start")
+
+    # the PS5 makes them visible again, the way it does after a game is played
+    for u in USERS:
+        qx(appdb, f'UPDATE "tbl_iconinfo_{u}" SET visible=1, dispLocation=138 WHERE titleId IN (?,?)',
+           "PPSA01325", "CUSA00900")
+    check(vis(appdb, "PPSA01325") == [1, 1], "system un-hid the folder's game")
+
+    # the watchdog re-hides them by itself, without re-running the payload
+    check(wait_for(lambda: vis(appdb, "PPSA01325") == [0, 0], 12), "folder game hidden again on its own")
+    check(vis(appdb, "CUSA00900") == [0, 0], "the separately hidden game too")
+    check("auto re-hide" in http("GET", "/api/diag", raw=True)[1].decode(), "the watchdog logged what it did")
+
+    # with the setting off, Home Hider leaves the PS5's change alone
+    http("POST", "/api/settings?reapply=0")
+    for u in USERS:
+        qx(appdb, f'UPDATE "tbl_iconinfo_{u}" SET visible=1 WHERE titleId=?', "PPSA01325")
+    time.sleep(8)
+    check(vis(appdb, "PPSA01325") == [1, 1], "left visible when 'Keep tiles hidden' is off")
+    s.stop()
+
+
+def tabs_tests(tmp):
+    print("move tiles between the Games and Media tabs")
+    appdb = os.path.join(tmp, "tab.db")
+    data = os.path.join(tmp, "tab-data")
+    apps = os.path.join(tmp, "tab-apps")
+    make_db(appdb)
+    original = dump(appdb)
+    s = Server(appdb, data, {"HH_USER_APP_DIR": apps})
+
+    def disp(tid):
+        return [q(appdb, f'SELECT visible, dispLocation FROM "tbl_iconinfo_{u}" WHERE titleId=?', tid)[0]
+                for u in USERS]
+
+    # CUSA01065 (Netflix) is on the Media tab -> move it to Games
+    code, r = http("POST", "/api/tab?id=CUSA01065&to=games")
+    check(code == 200, "moved a Media app to the Games tab")
+    for v, d in disp("CUSA01065"):
+        check(v == 1 and (d & 2) and not (d & 4), "it's visible and on the Games tab now (0x%02x)" % d)
+    check(q(appdb, "SELECT dispLocation FROM tbl_contentinfo WHERE titleId=?", "CUSA01065")[0][0] & 2,
+          "tbl_contentinfo moved too")
+    code, j = http("GET", "/api/tabs")
+    check(j["moved"] == [{"id": "CUSA01065", "dest": "games"}], "reported as moved")
+    by_id, _ = listing()
+    check(by_id["CUSA01065"]["tab"] == "games", "the list shows it on Games")
+
+    # and a Games tile to Media
+    code, r = http("POST", "/api/tab?id=PPSA01325&to=media")
+    check(code == 200 and all((d & 4) and not (d & 2) for _, d in disp("PPSA01325")), "moved a Games app to Media")
+
+    print("  refusals")
+    code, r = http("POST", "/api/tab?id=NPXS40071&to=media")
+    check(code == 409 and "PS5 decides" in r["error"], "Game Library (locked) can't be moved")
+    http("POST", "/api/hide?id=NPXS40053")
+    code, r = http("POST", "/api/tab?id=NPXS40053&to=games")
+    check(code == 409 and "hidden" in r["error"], "a hidden tile is refused")
+    http("POST", "/api/unhide?id=NPXS40053")
+    form("/api/folders/save", {"name": "F", "items": "CUSA00900"})
+    code, r = http("POST", "/api/tab?id=CUSA00900&to=games")
+    check(code == 409 and "folder" in r["error"], "a game inside a folder is refused")
+    http("POST", "/api/folders/delete?id=HHFD00001")
+    code, r = http("POST", "/api/tab?id=CUSA01065&to=sideways")
+    check(code == 409, "an unknown tab is refused")
+
+    print("  a tile that was tab-moved and then hidden stays hidden")
+    # the real bug: the watchdog/launch re-applied the tab move, which set
+    # visible=1 and brought a hidden tile (e.g. All Apps) back.
+    http("POST", "/api/tab?id=NPXS40053&to=games")   # move it (adds a tab_moved row)
+    http("POST", "/api/hide?id=NPXS40053")           # then hide it
+    check(vis(appdb, "NPXS40053") == [0, 0], "moved-then-hidden tile is hidden")
+    s.stop()
+    for u in USERS:                                  # the system brings it back on screen
+        qx(appdb, f'UPDATE "tbl_iconinfo_{u}" SET visible=1 WHERE titleId=?', "NPXS40053")
+    s = Server(appdb, data, {"HH_USER_APP_DIR": apps})
+    http("GET", "/api/status")                       # launch re-apply runs tabs_apply
+    check(vis(appdb, "NPXS40053") == [0, 0], "the tab re-apply leaves a hidden tile hidden")
+    http("POST", "/api/unhide?id=NPXS40053")
+    http("POST", "/api/tab?id=NPXS40053&to=reset")   # tidy up for the restore check below
+
+    print("  stays put, then undo")
+    s.stop()
+    for u in USERS:  # the system puts CUSA01065 back on Media
+        qx(appdb, f'UPDATE "tbl_iconinfo_{u}" SET dispLocation=188 WHERE titleId=?', "CUSA01065")
+    s = Server(appdb, data, {"HH_USER_APP_DIR": apps})
+    http("GET", "/api/status")
+    check(all((d & 2) for _, d in disp("CUSA01065")), "the move is re-applied at launch")
+    code, r = http("POST", "/api/tab?id=CUSA01065&to=reset")
+    check(code == 200 and disp("CUSA01065") == [(1, 188), (1, 188)], "reset puts it back on Media with its original value")
+    http("POST", "/api/tab?id=PPSA01325&to=reset")
+    check(dump(appdb) == original, "database back to the original once every move is undone")
+    menu = http("GET", "/", raw=True)[1]
+    check(b"Move to Media Tab" in menu and b"Move to Games Tab" in menu and b"teMove" in menu,
+          "move-between-tabs lives in the tile editor")
+    check(b"teTakeOut" in menu, "the tile editor can take an app out of its folder")
+    s.stop()
+
+
+def folder_move_tests(tmp):
+    print("move folders between tabs and take apps out of folders")
+    appdb = os.path.join(tmp, "fmove.db")
+    data = os.path.join(tmp, "fmove-data")
+    apps = os.path.join(tmp, "fmove-apps")
+    make_db(appdb)
+    s = Server(appdb, data, {"HH_USER_APP_DIR": apps})
+
+    def disp(tid):
+        return [q(appdb, f'SELECT visible, dispLocation FROM "tbl_iconinfo_{u}" WHERE titleId=?', tid)[0]
+                for u in USERS]
+
+    # a folder on the Games tab with two apps
+    code, r = form("/api/folders/save", {"name": "Fun", "tab": "games", "items": "PPSA01325,CUSA00900"})
+    fid = r["id"]
+    check(code == 200 and all((d & 2) and not (d & 4) for _, d in disp(fid)), "folder tile starts on the Games tab")
+
+    # move the whole folder to Media through the same endpoint apps use
+    code, r = http("POST", "/api/tab?id=" + fid + "&to=media")
+    check(code == 200 and all((d & 4) and not (d & 2) for _, d in disp(fid)), "folder tile moved to the Media tab")
+    check(http("GET", "/api/folders")[1]["folders"][0]["tab"] == "media", "folder remembers the Media tab")
+    code, r = http("POST", "/api/tab?id=" + fid + "&to=sideways")
+    check(code == 409, "an unknown tab is refused for a folder too")
+
+    # a folder and the Game Library can be positioned under Arrange (not tab-moved)
+    print("  arrange a folder (Game/App Library are left out)")
+
+    def acc(tid):
+        return [q(appdb, f'SELECT lastAccessIndex FROM "tbl_iconinfo_{u}" WHERE titleId=?', tid)[0][0] for u in USERS]
+
+    def pinned(tid):
+        return [q(appdb, f'SELECT count(*) FROM "tbl_group_{u}" WHERE itemId=? AND groupName=\'MyHome\'', tid)[0][0]
+                for u in USERS]
+
+    code, r = form("/api/arrange/save", {"items": LIBRARY + "," + fid + ",CUSA01065", "pinned": fid})
+    check(code == 200, "folder arranged")
+    ids = [i["id"] for i in http("GET", "/api/arrange")[1]["arrange"]["items"]]
+    check(LIBRARY not in ids, "Game Library can't be reordered (the PS5 places it)")
+    check(ids == [fid, "CUSA01065"], "the folder and app are arranged in order, Library skipped")
+    check(all(v > 1000000 for v in acc(fid)), "the folder is put in front")
+    check(pinned(fid) == [1, 1], "a folder can be pinned to MyHome")
+    check(http("POST", "/api/arrange/clear")[0] == 200, "arrangement cleared")
+
+    # take one app out: it comes back on its tab and leaves the folder
+    code, r = http("POST", "/api/folders/take_out?id=PPSA01325")
+    check(code == 200 and vis(appdb, "PPSA01325") == [1, 1], "app taken out is shown again")
+    code, j = http("GET", "/api/folder?id=" + fid)
+    check([i["id"] for i in j["folder"]["items"]] == ["CUSA00900"], "only the other app stays in the folder")
+    check(listing()[0]["PPSA01325"]["folder"] is None, "the list no longer shows it in a folder")
+    code, r = http("POST", "/api/tab?id=PPSA01325&to=media")
+    check(code == 200, "the freed app can now be moved on its own")
+
+    # take-out of something not in a folder is refused
+    code, r = http("POST", "/api/folders/take_out?id=CUSA01065")
+    check(code == 409 and "isn't in a folder" in r["error"], "take-out of a non-member refused")
+
+    # taking out the last app removes the folder and its tile
+    code, r = http("POST", "/api/folders/take_out?id=CUSA00900")
+    check(code == 200 and http("GET", "/api/folders")[1]["folders"] == [], "last app out removes the empty folder")
+    check(vis(appdb, "CUSA00900") == [1, 1], "the last app is shown again")
+    check(all(r_ == [] for r_ in tile_rows(appdb, fid)), "the folder tile is uninstalled")
+    s.stop()
+
+
 def live_tests(tmp):
     print("live wallpaper (built-in LiveShell Engine)")
     appdb = os.path.join(tmp, "live.db")
@@ -1490,6 +1679,110 @@ def live_tests(tmp):
     loader.close()
 
 
+def arrange_tests(tmp):
+    print("arrange the home screen (order + pin)")
+    appdb = os.path.join(tmp, "arr.db")
+    data = os.path.join(tmp, "arr-data")
+    make_db(appdb)
+    original = dump(appdb)
+
+    def acc(tid):
+        return [q(appdb, f'SELECT lastAccessIndex FROM "tbl_iconinfo_{u}" WHERE titleId=?', tid)[0][0] for u in USERS]
+
+    def pinned(tid):
+        return [q(appdb, f'SELECT count(*) FROM "tbl_group_{u}" WHERE itemId=? AND groupName=\'MyHome\'', tid)[0][0] for u in USERS]
+
+    orig_acc = {t: acc(t) for t in ("CUSA01065", "PPSA01325", "CUSA00900")}
+    s = Server(appdb, data)
+
+    print("  set an order")
+    code, r = form("/api/arrange/save", {"items": "CUSA01065,PPSA01325,CUSA00900", "pinned": ""})
+    check(code == 200, "order saved")
+    a1, a2, a3 = acc("CUSA01065"), acc("PPSA01325"), acc("CUSA00900")
+    check(all(v > 1000000 for v in a1 + a2 + a3), "arranged tiles put above the recency counter")
+    check(all(a1[u] > a2[u] > a3[u] for u in range(len(USERS))), "front tile highest, in the chosen order")
+    code, j = http("GET", "/api/arrange")
+    ar = j["arrange"]
+    check(ar["on"] and [i["id"] for i in ar["items"]] == ["CUSA01065", "PPSA01325", "CUSA00900"], "order reported")
+    check(ar["items"][0]["tab"] == "media" and ar["items"][1]["tab"] == "games", "tab per tile reported")
+
+    print("  pin")
+    code, r = form("/api/arrange/save", {"items": "PPSA01325,CUSA00900", "pinned": "PPSA01325"})
+    check(code == 200 and pinned("PPSA01325") == [1, 1], "pinned tile added to MyHome (both users)")
+    check(pinned("CUSA00900") == [0, 0], "unpinned tile not in MyHome")
+    check(acc("CUSA01065") == list(orig_acc["CUSA01065"]), "tile dropped from the order is restored")
+    code, j = http("GET", "/api/arrange")
+    check([i["pinned"] for i in j["arrange"]["items"]] == [True, False], "pin state reported")
+
+    print("  re-apply at launch")
+    s.stop()
+    for u in USERS:  # the system 'played' a game: its recency jumps
+        con = sqlite3.connect(appdb)
+        con.execute(f'UPDATE "tbl_iconinfo_{u}" SET lastAccessIndex=99 WHERE titleId=?', ("PPSA01325",))
+        con.commit()
+        con.close()
+    s = Server(appdb, data)
+    code, st = http("GET", "/api/status")
+    check(st["arrange_fixed"] >= 1, "arrangement re-applied at launch")
+    check(all(v > 1000000 for v in acc("PPSA01325")), "the bumped tile is put back in front")
+
+    print("  original values are the true originals, not ours")
+    # saved orig_access for PPSA01325 must be 36 (first-touch), even after re-apply
+    rows = q(data + "/state.db" if False else appdb, "SELECT 1") if False else None
+    code, r = http("POST", "/api/arrange/clear")
+    check(code == 200, "cleared")
+    check(acc("PPSA01325") == list(orig_acc["PPSA01325"]) and acc("CUSA00900") == list(orig_acc["CUSA00900"]),
+          "recency restored to the real originals")
+    check(pinned("PPSA01325") == [0, 0], "our pin removed")
+    check(pinned(STORE) == [1, 1], "a tile that was pinned before us is left alone")
+    check(dump(appdb) == original, "database back to the original after arrange + clear")
+
+    print("  reorder a tile the PS5 keeps pinned (e.g. PlayStation Store)")
+
+    def gidx(tid):
+        return [q(appdb, f"SELECT idx FROM \"tbl_group_{u}\" WHERE itemId=? AND groupName='MyHome'", tid)[0][0] for u in USERS]
+
+    before_idx = gidx(STORE)  # STORE is pinned in MyHome by make_db (idx 2)
+    code, r = form("/api/arrange/save", {"items": STORE + ",PPSA01325,CUSA00900", "pinned": ""})
+    check(code == 200 and pinned(STORE) == [1, 1], "the pinned tile stays pinned")
+    check(gidx(STORE) == [0, 0], "moving it to the front sets its MyHome idx to 0 (home screen orders pins by idx)")
+    code, r = http("POST", "/api/arrange/clear")
+    check(code == 200 and gidx(STORE) == before_idx, "its original pin position comes back after clear")
+    check(dump(appdb) == original, "database back to the original after the pinned-tile reorder")
+
+    print("  Game/App Library can't be reordered")
+    code, r = form("/api/arrange/save", {"items": LIBRARY + ",NPXS40139,PPSA01325", "pinned": ""})
+    ids = [i["id"] for i in http("GET", "/api/arrange")[1]["arrange"]["items"]]
+    check(LIBRARY not in ids and "NPXS40139" not in ids and ids == ["PPSA01325"], "Library tiles are skipped, the rest is arranged")
+    http("POST", "/api/arrange/clear")
+    check(dump(appdb) == original, "database back to the original")
+    code, j = http("GET", "/api/arrange")
+    check(not j["arrange"]["on"] and j["arrange"]["items"] == [], "arrangement empty")
+
+    print("  restore original backup clears the arrangement")
+    form("/api/arrange/save", {"items": "CUSA01065,PPSA01325", "pinned": "CUSA01065"})
+    code, r = http("POST", "/api/restore")
+    check(code == 200 and dump(appdb) == original, "restore puts the database back")
+    code, j = http("GET", "/api/arrange")
+    check(not j["arrange"]["on"], "arrangement gone after restore")
+
+    print("  errors")
+    code, r = form("/api/arrange/save", {"items": "bad!!,NPXS99999", "pinned": ""})
+    check(code == 200, "unknown/invalid ids are skipped, not fatal")
+    check(not http("GET", "/api/arrange")[1]["arrange"]["on"], "nothing arranged from junk input")
+    evil = urllib.request.Request(BASE + "/api/arrange/clear", method="POST", data=b"",
+                                  headers={"Origin": "http://evil.example"})
+    try:
+        urllib.request.urlopen(evil, timeout=5)
+        code = 200
+    except urllib.error.HTTPError as e:
+        code = e.code
+    check(code == 403, "other web sites can't change the arrangement")
+    menu = http("GET", "/", raw=True)[1]
+    check(b"ordMove" in menu and b"Save order" in menu, "inline ordering (merged arrange) is in the list")
+    s.stop()
+
+
 def glob_elves(root):
     out = []
     for d, _, files in os.walk(root):
@@ -1527,7 +1820,9 @@ def main():
         check(by_id["CUSA01065"]["tab"] == "media" and by_id["PPSA01325"]["tab"] == "games", "tabs from dispLocation")
         check(by_id["PPSA02000"]["tab"] == "none", "installed game with no tab still listed")
         check(by_id["PPSA01325"]["kind"] == "game" and by_id[STORE]["kind"] == "system", "kind reported")
-        check(LIBRARY not in by_id and "NPXS40139" not in by_id, "Game Library / App Library not offered")
+        check(by_id[LIBRARY]["locked"] and by_id["NPXS40139"]["locked"], "Game/App Library listed but flagged locked")
+        check(not by_id["PPSA01325"]["locked"] and not by_id[STORE]["locked"], "ordinary tiles are not locked")
+        check(not by_id[LIBRARY]["hidden"] and by_id[LIBRARY]["tab"] == "games", "Game Library on the Games tab, not hidden")
         check("NPXS40056" in by_id and by_id["NPXS40056"]["tab"] == "media", "All Apps offered on the Media tab")
         all_apps_before = dump(appdb)
         code, r = http("POST", "/api/hide?id=NPXS40056")
@@ -1536,10 +1831,12 @@ def main():
         check(dump(appdb) == all_apps_before, "All Apps shown again exactly")
         before_lock = dump(appdb)
         code, r = http("POST", "/api/hide?id=" + LIBRARY)
-        check(code == 409 and "always adds" in r["error"], "hiding Game Library refused")
+        check(code == 200 and listing()[0][LIBRARY]["hidden"], "Game Library can now be hidden")
         code, r = http("POST", "/api/hide?id=NPXS40139")
-        check(code == 409, "hiding App Library refused")
-        check(dump(appdb) == before_lock, "refused hides changed nothing")
+        check(code == 200 and listing()[0]["NPXS40139"]["hidden"], "App Library can now be hidden")
+        http("POST", "/api/unhide?id=" + LIBRARY)
+        http("POST", "/api/unhide?id=NPXS40139")
+        check(dump(appdb) == before_lock, "showing both Library tiles again restores them exactly")
         recents = [t["recent"] for t in ordered]
         check(recents == sorted(recents, reverse=True), "sorted most recent first")
         for tid in ("CUSA00900", "CUSA01065"):
@@ -1714,14 +2011,18 @@ def main():
         check(not os.path.exists(os.path.join(tmp, "missing.db")), "app.db never created")
         s.stop()
 
-        locked_migration_tests(tmp)
+        library_hide_tests(tmp)
         folder_tests(tmp)
         picture_tests(tmp)
         launch_tests(tmp)
         startup_mode_tests(tmp)
         custom_tests(tmp)
         background_tests(tmp)
+        watchdog_tests(tmp)
+        tabs_tests(tmp)
+        folder_move_tests(tmp)
         live_tests(tmp)
+        arrange_tests(tmp)
         updater_tests(tmp)
         print("\nALL %d CHECKS PASSED" % passed)
     finally:
